@@ -141,55 +141,41 @@ nothrow @safe unittest
     }
 }
 
-unittest
+@safe nothrow unittest
 {
     import std.sumtype : match;
+    import std.math : floor;
 
-    Result!int parse(string s)
-    {
-        import std.conv : to, ConvException;
-        Result!int v;
-        try
-        {
-            v = s.to!int;
-        }
-        catch(ConvException e)
-        {
-            v = new Error(e.toString());
-        }
-
-        return v;
-    }
-
-    Result!double reciprocal(int i)
-    {
-        if(i == 0) return Result!double(new Error("Division by zero"));
-        return Result!double(1./i);
-    }
-
-    string stringify(double v)
+    Result!int parse(string s) nothrow
     {
         import std.conv : to;
-        return v.to!string;
+        scope(failure) return Result!int(new Error(("Parsing of " ~ s ~ " failed")));
+        return Result!int(s.to!int);
+    }
+
+    Result!double reciprocal(int i) nothrow
+    {
+        if(i == 0) return Result!double(new Error("Division by zero"));
+        return Result!double(1/i);
     }
 
     auto success = parse("2")
         .apply!reciprocal
-        .apply!stringify;
+        .apply!floor;
 
     assert(success.match!(
         (Error e) => assert(false),
-        (string v) => v == "0.5"
+        (double v) => v == 0.
     ));
 
     auto failure = parse("k")
         .apply!reciprocal
-        .apply!stringify;
+        .apply!floor;
     assert(failure.isFailure);
 
     auto otherFailure = parse("0")
         .apply!reciprocal
-        .apply!stringify;
+        .apply!floor;
     assert(otherFailure.isFailure);
 }
 
