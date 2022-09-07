@@ -1,0 +1,33 @@
+# This workflow uses actions that are not certified by GitHub.
+# They are provided by a third-party and are governed by
+# separate terms of service, privacy policy, and support
+# documentation.
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    name: Test
+    strategy:
+      matrix:
+        dc:
+          - dmd-2.100.0
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - uses: dlang-community/setup-dlang@v1
+      name: 'Install compiler'
+      with:
+        compiler: ${{ matrix.dc }}
+
+    - name: 'Run application tests'
+      run: dub test --build=unittest-cov --config=application
+
+    - uses: codecov/codecov-action@v1
