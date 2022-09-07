@@ -295,6 +295,13 @@ if(isResult!T)
     assert(success.rc.front.values[0] == S1(0));
 }
 
+/**
+Convert a `Result` to `Nullable`
+Params:
+    t = a `Result`
+Returns:
+    a `(Nullable!TypeOfSuccess)`
+*/
 auto toNullable(T)(auto ref T t)
 if(isResult!T)
 {
@@ -338,4 +345,63 @@ if(isResult!T)
         const success = Result!S2(S2([S1(0), S1(1)]));
         assert(!success.toNullable.isNull);
     }
+}
+
+/// Extract the success value of a success `Result`
+auto get(T)(auto ref T t)
+{
+    import std.sumtype : match;
+
+    assert(t.isSuccess, "Trying to unpack value of a failure Result");
+    return t.match!(
+        (inout Error e) => assert(false),
+        (inout TypeOfSuccess!T v) => v
+    );
+}
+
+@safe nothrow unittest
+{
+    {
+        Result!int success = 42;
+        assert(success.get() == 42);
+    }
+
+    {
+        const success = Result!int(42);
+        assert(success.get() == 42);
+    }
+
+    {
+        import std.algorithm : equal;
+
+        struct S1
+        {
+            int value;
+        }
+
+        struct S2
+        {
+            S1[] values;
+        }
+
+        const success = Result!S2(S2([S1(0), S1(1)]));
+        assert(success.get.values.equal([S1(0), S1(1)]));
+    }
+}
+
+/// Extract the success value of a success `Result` or the provided fallback if the `Result` is a failure
+inout(U) get(T, U)(auto ref T t, inout(U) fallback)
+if(isResult!T && is(U : TypeOfSuccess!T))
+{
+    if(t.isFailure) return fallback;
+    return get(t);
+}
+
+@safe nothrow unittest
+{
+    Result!int failure = new Error("");
+    assert(failure.get(42) == 42);
+
+    Result!int success = 42;
+    assert(success.get(43) == 42);
 }
