@@ -294,3 +294,48 @@ if(isResult!T)
     const success = Result!S2(S2([S1(0), S1(1)]));
     assert(success.rc.front.values[0] == S1(0));
 }
+
+auto toNullable(T)(auto ref T t)
+if(isResult!T)
+{
+    import std.traits : CopyConstness;
+    import std.sumtype : match;
+
+    alias ST = CopyConstness!(T, TypeOfSuccess!T);
+
+    return t.match!(
+        (inout Error e) => (Nullable!ST).init,
+        (inout TypeOfSuccess!T v) => Nullable!ST(v)
+    );
+}
+
+@safe nothrow unittest
+{
+    {
+        Result!int success = 42;
+        assert(success.toNullable.get == 42);
+
+        Result!int failure = new Error("");
+        assert(failure.toNullable.isNull);
+    }
+
+    {
+        const success = Result!int(42);
+        assert(success.toNullable.get == 42);
+    }
+
+    {
+        struct S1
+        {
+            int value;
+        }
+
+        struct S2
+        {
+            S1[] values;
+        }
+
+        const success = Result!S2(S2([S1(0), S1(1)]));
+        assert(!success.toNullable.isNull);
+    }
+}
