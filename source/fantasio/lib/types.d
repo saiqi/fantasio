@@ -89,10 +89,20 @@ template apply(alias fun)
         alias SuccessType = TypeOfSuccess!T;
         alias FunType = typeof(unaryFun!fun(SuccessType.init));
 
-        return t.match!(
-            (Error failure) => Result!FunType(failure),
-            (SuccessType success) => Result!FunType(fun(success))
-        );
+        static if(isResult!FunType)
+        {
+            return t.match!(
+                (Error failure) => FunType(failure),
+                (SuccessType success) => fun(success)
+            );
+        }
+        else
+        {
+            return t.match!(
+                (Error failure) => Result!FunType(failure),
+                (SuccessType success) => Result!FunType(fun(success))
+            );
+        }
     }
 }
 
@@ -129,6 +139,58 @@ nothrow @safe unittest
         Result!string result = failure.apply!(a => a.to!string);
         assert(result.isFailure);
     }
+}
+
+unittest
+{
+    import std.sumtype : match;
+
+    Result!int parse(string s)
+    {
+        import std.conv : to, ConvException;
+        Result!int v;
+        try
+        {
+            v = s.to!int;
+        }
+        catch(ConvException e)
+        {
+            v = new Error(e.toString());
+        }
+
+        return v;
+    }
+
+    Result!double reciprocal(int i)
+    {
+        if(i == 0) return Result!double(new Error("Division by zero"));
+        return Result!double(1./i);
+    }
+
+    string stringify(double v)
+    {
+        import std.conv : to;
+        return v.to!string;
+    }
+
+    auto success = parse("2")
+        .apply!reciprocal
+        .apply!stringify;
+
+    assert(success.match!(
+        (Error e) => assert(false),
+        (string v) => v == "0.5"
+    ));
+
+    auto failure = parse("k")
+        .apply!reciprocal
+        .apply!stringify;
+    assert(failure.isFailure);
+
+    auto otherFailure = parse("0")
+        .apply!reciprocal
+        .apply!stringify;
+    assert(otherFailure.isFailure);
 }
 
 /// Rangify a `Result`
