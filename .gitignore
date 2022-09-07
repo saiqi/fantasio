@@ -1,0 +1,15 @@
+.dub
+docs.json
+__dummy.html
+docs/
+/fantasio
+fantasio.so
+fantasio.dylib
+fantasio.dll
+fantasio.a
+fantasio.lib
+fantasio-test-*
+*.exe
+*.o
+*.obj
+*.lst

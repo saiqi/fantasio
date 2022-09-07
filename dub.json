@@ -1,0 +1,12 @@
+{
+	"authors": [
+		"saiqi"
+	],
+	"copyright": "Copyright © 2022, saiqi",
+	"dependencies": {
+		"dxml": "~>0.4.3"
+	},
+	"description": "A lightweight ETL solution",
+	"license": "MIT",
+	"name": "fantasio"
+}
