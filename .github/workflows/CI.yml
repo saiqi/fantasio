@@ -28,6 +28,6 @@ jobs:
         compiler: ${{ matrix.dc }}
 
     - name: 'Run application tests'
-      run: dub test --build=unittest-cov --config=application
+      run: dub test --build=unittest-cov
 
     - uses: codecov/codecov-action@v1

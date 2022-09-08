@@ -1,7 +1,62 @@
 module fantasio.lib.types;
 
 import std.typecons : Nullable;
+import std.traits : isMutable,  isAssignable;
 import std.sumtype : SumType;
+
+struct RResult(T)
+{
+    SumType!(Error, T) payload;
+    alias payload this;
+
+    private bool _isSuccess;
+
+    this(T value) pure
+    {
+        this.payload = SumType!(Error, T)(value);
+        this._isSuccess = true;
+    }
+
+    this(Error e) pure
+    {
+        this.payload = SumType!(Error, T)(e);
+        this._isSuccess = false;
+    }
+
+    auto ref opAssign(E : Error)(E error) if(isMutable!T)
+    {
+        (() @trusted {this.payload = error;})();
+        this._isSuccess = true;
+        return this;
+    }
+
+    auto ref opAssign(U : T)(auto ref U value) if(isMutable!T && isAssignable!(T, U))
+    {
+        (() @trusted {this.payload = value;})();
+        this._isSuccess = true;
+        return this;
+    }
+
+    auto ref opAssign(U : T)(auto ref RResult!U value) if(isMutable!T && isAssignable!(T, U))
+    {
+        import std.algorithm.mutation : move;
+        (() @trusted {this.payload = move(value);})();
+        return this;
+    }
+}
+
+@("foo")
+@safe nothrow unittest
+{
+    static assert(isResult!(RResult!int));
+    auto success = RResult!int(42);
+    auto failure = RResult!int(new Error(""));
+
+    success = 43;
+    success = 42u;
+    success = new Error("");
+    success = failure;
+}
 
 /// Return true if `T` is an instance of `std.typecons.Nullable`
 enum bool isNullable(T) = is(T: Nullable!Arg, Arg);
@@ -146,16 +201,32 @@ nothrow @safe unittest
     import std.sumtype : match;
     import std.math : floor;
 
+    class ParserError : Error
+    {
+        pure nothrow @nogc @safe this(string msg, Throwable nextInChain = null)
+        {
+            super(msg, nextInChain);
+        }
+    }
+
+    class ZeroDivisionError : Error
+    {
+        pure nothrow @nogc @safe this(string msg, Throwable nextInChain = null)
+        {
+            super(msg, nextInChain);
+        }
+    }
+
     Result!int parse(string s) nothrow
     {
         import std.conv : to;
-        scope(failure) return Result!int(new Error(("Parsing of " ~ s ~ " failed")));
+        scope(failure) return Result!int(new ParserError(("Parsing of " ~ s ~ " failed")));
         return Result!int(s.to!int);
     }
 
     Result!double reciprocal(int i) nothrow
     {
-        if(i == 0) return Result!double(new Error("Division by zero"));
+        if(i == 0) return Result!double(new ZeroDivisionError("Division by zero"));
         return Result!double(1/i);
     }
 
@@ -314,15 +385,6 @@ if(isResult!T)
         .joiner;
 
     assert(values.equal([1, 0.5]));
-}
-
-@safe nothrow unittest
-{
-    import std.algorithm : map;
-
-    immutable success = Result!int(42);
-    auto value = success.rc.map!"a + 1".front;
-    assert(value == 43);
 }
 
 @safe nothrow unittest

@@ -13,3 +13,5 @@ fantasio-test-*
 *.o
 *.obj
 *.lst
+bin/
+dub.selections.json
