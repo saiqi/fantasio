@@ -4,17 +4,24 @@ import std.typecons : Nullable;
 import std.traits : isMutable,  isAssignable;
 import std.sumtype : SumType;
 
+version(Have_unit_threaded)
+{
+    import unit_threaded;
+}
+
 struct RResult(T)
 {
     SumType!(Error, T) payload;
     alias payload this;
 
     private bool _isSuccess;
+    private T _value = T.init;
 
     this(T value) pure
     {
         this.payload = SumType!(Error, T)(value);
         this._isSuccess = true;
+        this._value = this.payload.get;
     }
 
     this(Error e) pure
@@ -26,7 +33,7 @@ struct RResult(T)
     auto ref opAssign(E : Error)(E error) if(isMutable!T)
     {
         (() @trusted {this.payload = error;})();
-        this._isSuccess = true;
+        this._isSuccess = false;
         return this;
     }
 
@@ -34,6 +41,7 @@ struct RResult(T)
     {
         (() @trusted {this.payload = value;})();
         this._isSuccess = true;
+        this._value = this.payload.get;
         return this;
     }
 
@@ -41,11 +49,31 @@ struct RResult(T)
     {
         import std.algorithm.mutation : move;
         (() @trusted {this.payload = move(value);})();
+        if(this.payload.isSuccess)
+            this._value = this.payload.get;
+        else
+            this._value = T.init;
         return this;
+    }
+
+    @property bool empty() nothrow const @safe
+    {
+        return !this._isSuccess || this.payload.isFailure;
+    }
+
+    @property ref inout(T) front() inout return nothrow @safe
+    {
+        assert(!empty, "Attempting to fetch front value of an empty result");
+        return this._value;
+    }
+
+    void popFront()
+    {
+        this._isSuccess = false;
     }
 }
 
-@("foo")
+@("a result can be assigned")
 @safe nothrow unittest
 {
     static assert(isResult!(RResult!int));
@@ -58,14 +86,20 @@ struct RResult(T)
     success = failure;
 }
 
+@("results are ranges")
+@safe unittest
+{
+    import std.range : isInputRange;
+    static assert(isInputRange!(RResult!int));
+    RResult!int r = 42;
+    r.front.should == 42;
+    r.empty.should.not == true;
+    r.popFront();
+    r.empty.should == true;
+}
+
 /// Return true if `T` is an instance of `std.typecons.Nullable`
 enum bool isNullable(T) = is(T: Nullable!Arg, Arg);
-
-unittest
-{
-    static assert(isNullable!(Nullable!int));
-    static assert(!isNullable!int);
-}
 
 /// Either `T` or an instance of `Error`
 alias Result(T) = SumType!(Error, T);
@@ -73,19 +107,7 @@ alias Result(T) = SumType!(Error, T);
 /// Return true if `T` is an instance of `fantasio.lib.types.Result`
 enum bool isResult(T) = is(T: SumType!(Error, Arg), Arg);
 
-unittest
-{
-    static assert(isResult!(Result!int));
-    static assert(isResult!(SumType!(Error, int)));
-    static assert(!isResult!int);
-}
-
 private alias TypeOfSuccess(T: SumType!(Error, Arg), Arg) = Arg;
-
-unittest
-{
-    static assert(is(TypeOfSuccess!(Result!int) == int));
-}
 
 /// Return true if `Result` `t` is not an error
 bool isSuccess(T)(auto ref inout T t)
@@ -108,18 +130,19 @@ if(isResult!T)
     return !isSuccess(t);
 }
 
+@("a result that is a success or a failure can be qualified")
 unittest
 {
-    Result!int inverse(int v) pure nothrow @safe
+    Result!int reciprocal(int v) pure nothrow @safe
     {
         if(v == 0) return Result!int(new Error("Division by zero"));
         return Result!int(1/v);
     }
 
-    assert(inverse(1).isSuccess);
-    assert(!inverse(1).isFailure);
-    assert(!inverse(0).isSuccess);
-    assert(inverse(0).isFailure);
+    reciprocal(1).isSuccess.should == true;
+    reciprocal(1).isFailure.should == false;
+    reciprocal(0).isSuccess.should == false;
+    reciprocal(0).isFailure.should == true;
 }
 
 /**
@@ -161,44 +184,36 @@ template apply(alias fun)
     }
 }
 
-nothrow @safe unittest
+@("a function when applying to a success result should return a success result")
+@safe unittest
 {
-    import std.sumtype : match;
-
     Result!int success = 42;
-    {
-        Result!int result = success.apply!(a => a + 1);
-        assert(result.match!(
-            (Error e) => false,
-            (int v) => v == 43
-        ));
-    }
-
-    {
-        import std.conv : to;
-        Result!string result = success.apply!(a => a.to!string);
-        assert(result.match!(
-            (Error e) => false,
-            (string v) => v == "42"
-        ));
-    }
-
-    Result!int failure = new Error("");
-    {
-        Result!int result = failure.apply!(a => a + 1);
-        assert(result.isFailure);
-    }
-
-    {
-        import std.conv : to;
-        Result!string result = failure.apply!(a => a.to!string);
-        assert(result.isFailure);
-    }
+    Result!int result = success.apply!(a => a + 1);
+    result.isSuccess.should == true;
+    result.get.should == 43;
 }
 
-@safe nothrow unittest
+@("a function that returns a different type when applying to a success result should return a result of this type")
+@safe unittest
 {
-    import std.sumtype : match;
+    import std.conv : to;
+    Result!int success = 42;
+    Result!string result = success.apply!(a => a.to!string);
+    result.isSuccess.should == true;
+    result.get.should == "42";
+}
+
+@("a function when applying to a failure result should return a failure result")
+@safe unittest
+{
+    Result!int failure = new Error("");
+    Result!int result = failure.apply!(a => a + 1);
+    result.isFailure.should == true;
+}
+
+@("apply calls can be chained")
+@safe unittest
+{
     import std.math : floor;
 
     class ParserError : Error
@@ -233,176 +248,19 @@ nothrow @safe unittest
     auto success = parse("2")
         .apply!reciprocal
         .apply!floor;
-
-    assert(success.match!(
-        (Error e) => assert(false),
-        (double v) => v == 0.
-    ));
+    
+    success.isSuccess.should == true;
+    success.get.should == 0.;
 
     auto failure = parse("k")
         .apply!reciprocal
         .apply!floor;
-    assert(failure.isFailure);
+    failure.isFailure.should == true;
 
     auto otherFailure = parse("0")
         .apply!reciprocal
         .apply!floor;
-    assert(otherFailure.isFailure);
-}
-
-/// Rangify a `Result`
-auto rc(T)(auto ref T t)
-if(isResult!T)
-{
-    import std.sumtype : match;
-
-    static struct ResultRange
-    {
-        import std.traits : CopyConstness;
-        alias ST = CopyConstness!(T, TypeOfSuccess!T);
-
-        private ST _value = ST.init;
-        private bool validated;
-
-        this(T t) pure
-        {
-            if(t.isSuccess)
-            {
-                this._value = t.match!(
-                    (ST v) => v,
-                    _ => assert(false)
-                );
-                this.validated = true;
-            }
-            else
-            {
-                this.validated = false;
-            }
-        }
-
-        @property bool empty() inout @safe pure nothrow
-        {
-            return !this.validated;
-        }
-
-        @property ref inout(ST) front() inout @safe pure nothrow
-        {
-            assert(!empty);
-            return this._value;
-        }
-
-        alias back = front;
-
-        void popFront()
-        {
-            assert(!empty);
-            this.validated = false;
-        }
-
-        @property size_t length() const @safe pure nothrow
-        {
-            return !empty;
-        }
-
-        @property inout(typeof(this)) save() inout
-        {
-            return this;
-        }
-
-        alias popBack = popFront;
-
-        inout(typeof(this)) opIndex() inout
-        {
-            return this;
-        }
-
-        inout(typeof(this)) opIndex(size_t[2] dim) inout
-        in (dim[0] <= length && dim[1] <= length && dim[1] >= dim[0])
-        {
-            return (dim[0] == 0 && dim[1] == 1) ? this : this.init;
-        }
-
-        size_t[2] opSlice(size_t dim : 0)(size_t from, size_t to) const
-        {
-            return [from, to];
-        }
-
-        alias opDollar(size_t dim : 0) = length;
-
-        ref inout(ST) opIndex(size_t index) inout @safe pure nothrow
-        in (index < length)
-        {
-            return this._value;
-        }
-
-    }
-
-    return ResultRange(t);
-}
-
-@safe nothrow unittest
-{
-    import std.algorithm : equal;
-
-    Result!int success = 42;
-    auto range = success.rc;
-    assert(!range.empty);
-    assert(range.front == 42);
-    assert(range.length == 1);
-    assert(range[0] == 42);
-    assert(range[].equal([42]));
-    assert(range[0 .. $].equal([42]));
-
-    auto copy = range.save;
-    range.popFront();
-    assert(range.empty);
-    assert(range.length == 0);
-    assert(!copy.empty);
-    assert(copy.front == 42);
-    assert(copy.length == 1);
-
-    Result!int failure = new Error("");
-    assert(failure.rc.empty);
-    assert(failure.rc.length == 0);
-    assert(failure.rc[].length == 0);
-    assert(failure.rc[0 .. $].length == 0);
-}
-
-@safe nothrow unittest
-{
-    import std.algorithm : map, joiner, equal;
-    import std.range : iota;
-
-    Result!double inverse(int a)
-    {
-        if(a == 0) return Result!double(new Error("Division by zero"));
-        return Result!double(1./a);
-    }
-
-    auto values = iota(3)
-        .map!inverse
-        .map!rc
-        .joiner;
-
-    assert(values.equal([1, 0.5]));
-}
-
-@safe nothrow unittest
-{
-    import std.algorithm : map;
-
-    struct S1
-    {
-        int value;
-    }
-
-    struct S2
-    {
-        S1[] values;
-    }
-
-    const success = Result!S2(S2([S1(0), S1(1)]));
-    assert(success.rc.front.values[0] == S1(0));
+    otherFailure.isFailure.should == true;
 }
 
 /**
@@ -426,35 +284,41 @@ if(isResult!T)
     );
 }
 
-@safe nothrow unittest
+@("a success result should be converted to a non-null nullable")
+@safe unittest
 {
-    {
         Result!int success = 42;
-        assert(success.toNullable.get == 42);
+        success.toNullable.get.should == 42;
+}
 
-        Result!int failure = new Error("");
-        assert(failure.toNullable.isNull);
-    }
+@("a failure result should be converted to a null nullable")
+@safe unittest {
+    Result!int failure = new Error("");
+    failure.toNullable.isNull.should == true;
+}
 
+@("a const success result can be converted to nullable")
+@safe unittest
+{
+    const success = Result!int(42);
+    success.toNullable.get.should == 42;
+}
+
+@("a const success result of nested struct can be converted to nullable")
+@safe unittest
+{
+    struct S1
     {
-        const success = Result!int(42);
-        assert(success.toNullable.get == 42);
+        int value;
     }
 
+    struct S2
     {
-        struct S1
-        {
-            int value;
-        }
-
-        struct S2
-        {
-            S1[] values;
-        }
-
-        const success = Result!S2(S2([S1(0), S1(1)]));
-        assert(!success.toNullable.isNull);
+        S1[] values;
     }
+
+    const success = Result!S2(S2([S1(0), S1(1)]));
+    success.toNullable.isNull.should.not == true;
 }
 
 /// Extract the success value of a success `Result`
@@ -469,34 +333,35 @@ auto get(T)(auto ref T t)
     );
 }
 
-@safe nothrow unittest
+@("the value of a success result can be extracted")
+@safe unittest
 {
+    Result!int success = 42;
+    success.get.should == 42;
+}
+
+@("the value of a const success result can be extracted")
+@safe unittest
+{
+    const success = Result!int(42);
+    success.get.should == 42;
+}
+
+@("the value of a const success result of nested struct can be extracted")
+@safe unittest
+{
+    struct S1
     {
-        Result!int success = 42;
-        assert(success.get() == 42);
+        int value;
     }
 
+    struct S2
     {
-        const success = Result!int(42);
-        assert(success.get() == 42);
+        S1[] values;
     }
 
-    {
-        import std.algorithm : equal;
-
-        struct S1
-        {
-            int value;
-        }
-
-        struct S2
-        {
-            S1[] values;
-        }
-
-        const success = Result!S2(S2([S1(0), S1(1)]));
-        assert(success.get.values.equal([S1(0), S1(1)]));
-    }
+    const success = Result!S2(S2([S1(0), S1(1)]));
+    success.get.values.should == [S1(0), S1(1)];
 }
 
 /// Extract the success value of a success `Result` or the provided fallback if the `Result` is a failure
@@ -507,11 +372,16 @@ if(isResult!T && is(U : TypeOfSuccess!T))
     return get(t);
 }
 
-@safe nothrow unittest
+@("a failure result when extracting its value providing a fallback should return the fallback")
+@safe unittest
 {
     Result!int failure = new Error("");
-    assert(failure.get(42) == 42);
+    failure.get(42).should == 42;
+}
 
+@("a success result when extracting its value providing a fallback should return the value of the result")
+@safe unittest
+{
     Result!int success = 42;
     assert(success.get(43) == 42);
 }
