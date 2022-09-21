@@ -9,9 +9,10 @@ version(Have_unit_threaded) { import unit_threaded; }
 else                        { enum ShouldFail; }
 
 /// A struct that can be either a success of type `T` or a failure of type `Error`
-@mustuse struct Result(T)
+@mustuse struct Result(T, E = Error)
+if(is(E : Error))
 {
-    SumType!(Error, T) payload;
+    SumType!(E, T) payload;
     alias payload this;
 
     private bool _isSuccess;
@@ -19,18 +20,18 @@ else                        { enum ShouldFail; }
 
     this(T value) pure
     {
-        this.payload = SumType!(Error, T)(value);
+        this.payload = SumType!(E, T)(value);
         this._isSuccess = true;
         this._value = this.payload.get;
     }
 
-    this(Error e) pure
+    this(E e) pure
     {
-        this.payload = SumType!(Error, T)(e);
+        this.payload = SumType!(E, T)(e);
         this._isSuccess = false;
     }
 
-    auto ref opAssign(E : Error)(E error) if(isMutable!T)
+    auto ref opAssign()(E error) if(isMutable!T)
     {
         (() @trusted {this.payload = error;})();
         this._isSuccess = false;
@@ -86,6 +87,26 @@ else                        { enum ShouldFail; }
     success = failure;
 }
 
+@("a result can match on user defined error")
+@safe unittest
+{
+    import std.sumtype : match;
+
+    class MyError : Error
+    {
+        pure nothrow @nogc @safe this(string msg, Throwable nextInChain = null)
+        {
+            super(msg, nextInChain);
+        }
+    }
+
+    auto failure = Result!(int, MyError)(new MyError(""));
+    failure.match!(
+        (MyError e) => "MyError",
+        _ => "NoError"
+    ).shouldEqual("MyError");
+}
+
 @("results are ranges")
 unittest
 {
@@ -121,9 +142,10 @@ unittest
 enum bool isNullable(T) = is(T: Nullable!Arg, Arg);
 
 /// Return true if `T` is an instance of `fantasio.lib.types.Result`
-enum bool isResult(T) = is(T: SumType!(Error, Arg), Arg);
+enum bool isResult(T) = is(T: SumType!(E, Arg), E : Error, Arg);
 
-private alias TypeOfSuccess(T: SumType!(Error, Arg), Arg) = Arg;
+private alias TypeOfSuccess(T: SumType!(E, Arg), E: Error, Arg) = Arg;
+private alias TypeOfFailure(T: SumType!(E, Arg), E: Error, Arg) = E;
 
 /// Return true if `Result` `t` is not an error
 bool isSuccess(T)(auto ref inout T t)
@@ -181,21 +203,28 @@ template apply(alias fun)
     if(isResult!T)
     {
         alias SuccessType = TypeOfSuccess!T;
+        alias FailureType = TypeOfFailure!T;
         alias FunType = typeof(unaryFun!fun(SuccessType.init));
 
         static if(isResult!FunType)
         {
+            alias ResultType = Result!(TypeOfSuccess!FunType, Error);
+
             return t.match!(
-                (Error failure) => FunType(failure),
-                (SuccessType success) => fun(success)
-            );
+                (FailureType failure) => ResultType(failure),
+                (SuccessType success) {
+                    return fun(success)
+                        .match!(
+                            (TypeOfSuccess!FunType s) => ResultType(s),
+                            (Error e) => ResultType(e) 
+                        );
+                });
         }
         else
         {
             return t.match!(
-                (Error failure) => Result!FunType(failure),
-                (SuccessType success) => Result!FunType(fun(success))
-            );
+                (FailureType failure) => Result!FunType(failure),
+                (SuccessType success) => Result!FunType(fun(success)));
         }
     }
 }
@@ -231,18 +260,35 @@ template apply(alias fun)
 @safe unittest
 {
     import std.math : floor;
+    import std.sumtype : match;
 
-    Result!int parse(string s) nothrow
+    class ParserError : Error
     {
-        import std.conv : to;
-        scope(failure) return Result!int(new Error(("Parsing of " ~ s ~ " failed")));
-        return Result!int(s.to!int);
+        pure nothrow @nogc @safe this(string msg, Throwable nextInChain = null)
+        {
+            super(msg, nextInChain);
+        }
     }
 
-    Result!double reciprocal(int i) nothrow
+    class ZeroDivisionError : Error
     {
-        if(i == 0) return Result!double(new Error("Division by zero"));
-        return Result!double(1/i);
+        pure nothrow @nogc @safe this(string msg, Throwable nextInChain = null)
+        {
+            super(msg, nextInChain);
+        }
+    }
+
+    Result!(int, ParserError) parse(string s) nothrow
+    {
+        import std.conv : to;
+        scope(failure) return Result!(int, ParserError)(new ParserError(("Parsing of " ~ s ~ " failed")));
+        return Result!(int, ParserError)(s.to!int);
+    }
+
+    Result!(double, ZeroDivisionError) reciprocal(int i) nothrow
+    {
+        if(i == 0) return Result!(double, ZeroDivisionError)(new ZeroDivisionError("Division by zero"));
+        return Result!(double, ZeroDivisionError)(1/i);
     }
 
     auto success = parse("2")
