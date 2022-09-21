@@ -213,34 +213,17 @@ template apply(alias fun)
 @safe unittest
 {
     import std.math : floor;
-    import std.sumtype : match;
-
-    class ParserError : Error
-    {
-        pure nothrow @nogc @safe this(string msg, Throwable nextInChain = null)
-        {
-            super(msg, nextInChain);
-        }
-    }
-
-    class ZeroDivisionError : Error
-    {
-        pure nothrow @nogc @safe this(string msg, Throwable nextInChain = null)
-        {
-            super(msg, nextInChain);
-        }
-    }
 
     Result!int parse(string s) nothrow
     {
         import std.conv : to;
-        scope(failure) return Result!int(new ParserError(("Parsing of " ~ s ~ " failed")));
+        scope(failure) return Result!int(new Error(("Parsing of " ~ s ~ " failed")));
         return Result!int(s.to!int);
     }
 
     Result!double reciprocal(int i) nothrow
     {
-        if(i == 0) return Result!double(new ZeroDivisionError("Division by zero"));
+        if(i == 0) return Result!double(new Error("Division by zero"));
         return Result!double(1/i);
     }
 
