@@ -5,7 +5,7 @@ import std.traits : isMutable,  isAssignable;
 import std.sumtype : SumType;
 
 version(Have_unit_threaded) { import unit_threaded; }
-else                        { enum SouldFail; }
+else                        { enum ShouldFail; }
 
 /// A struct that can be either a success of type `T` or a failure of type `Error`
 struct Result(T)
