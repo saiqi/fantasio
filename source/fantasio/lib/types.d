@@ -7,7 +7,8 @@ import std.sumtype : SumType;
 version(Have_unit_threaded) { import unit_threaded; }
 else                        { enum SouldFail; }
 
-struct RResult(T)
+/// A struct that can be either a success of type `T` or a failure of type `Error`
+struct Result(T)
 {
     SumType!(Error, T) payload;
     alias payload this;
@@ -43,7 +44,7 @@ struct RResult(T)
         return this;
     }
 
-    auto ref opAssign(U : T)(auto ref RResult!U value) if(isMutable!T && isAssignable!(T, U))
+    auto ref opAssign(U : T)(auto ref Result!U value) if(isMutable!T && isAssignable!(T, U))
     {
         import std.algorithm.mutation : move;
         (() @trusted {this.payload = move(value);})();
@@ -74,9 +75,9 @@ struct RResult(T)
 @("a result can be assigned")
 @safe nothrow unittest
 {
-    static assert(isResult!(RResult!int));
-    auto success = RResult!int(42);
-    auto failure = RResult!int(new Error(""));
+    static assert(isResult!(Result!int));
+    auto success = Result!int(42);
+    auto failure = Result!int(new Error(""));
 
     success = 43;
     success = 42u;
@@ -88,19 +89,34 @@ struct RResult(T)
 unittest
 {
     import std.range : isInputRange;
-    static assert(isInputRange!(RResult!int));
-    RResult!int r = 42;
+    static assert(isInputRange!(Result!int));
+    Result!int r = 42;
     r.front.shouldEqual(42);
     r.shouldNotBeEmpty;
     r.popFront();
     r.shouldBeEmpty;
 }
 
+@("range algorithms can be applied to result")
+@safe unittest
+{
+    import std.range : iota;
+    import std.algorithm : map, joiner;
+
+    Result!int reciprocal(const int v) pure nothrow @safe
+    {
+        if(v == 0) return Result!int(new Error(""));
+        return Result!int(1/v);
+    }
+
+    iota(2)
+        .map!reciprocal
+        .joiner
+        .shouldEqual([1]);
+}
+
 /// Return true if `T` is an instance of `std.typecons.Nullable`
 enum bool isNullable(T) = is(T: Nullable!Arg, Arg);
-
-/// Either `T` or an instance of `Error`
-alias Result(T) = SumType!(Error, T);
 
 /// Return true if `T` is an instance of `fantasio.lib.types.Result`
 enum bool isResult(T) = is(T: SumType!(Error, Arg), Arg);
