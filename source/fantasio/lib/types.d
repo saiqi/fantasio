@@ -1,5 +1,6 @@
 module fantasio.lib.types;
 
+import core.attribute : mustuse;
 import std.typecons : Nullable;
 import std.traits : isMutable,  isAssignable;
 import std.sumtype : SumType;
@@ -8,7 +9,7 @@ version(Have_unit_threaded) { import unit_threaded; }
 else                        { enum ShouldFail; }
 
 /// A struct that can be either a success of type `T` or a failure of type `Error`
-struct Result(T)
+@mustuse struct Result(T)
 {
     SumType!(Error, T) payload;
     alias payload this;
@@ -101,7 +102,7 @@ unittest
 @safe unittest
 {
     import std.range : iota;
-    import std.algorithm : map, joiner;
+    import std.algorithm : map, filter;
 
     Result!int reciprocal(const int v) pure nothrow @safe
     {
@@ -111,7 +112,8 @@ unittest
 
     iota(2)
         .map!reciprocal
-        .joiner
+        .filter!isSuccess
+        .map!get
         .shouldEqual([1]);
 }
 
