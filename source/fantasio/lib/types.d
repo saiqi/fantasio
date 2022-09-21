@@ -4,10 +4,8 @@ import std.typecons : Nullable;
 import std.traits : isMutable,  isAssignable;
 import std.sumtype : SumType;
 
-version(Have_unit_threaded)
-{
-    import unit_threaded;
-}
+version(Have_unit_threaded) { import unit_threaded; }
+else                        { enum SouldFail; }
 
 struct RResult(T)
 {
@@ -87,15 +85,15 @@ struct RResult(T)
 }
 
 @("results are ranges")
-@safe unittest
+unittest
 {
     import std.range : isInputRange;
     static assert(isInputRange!(RResult!int));
     RResult!int r = 42;
-    r.front.should == 42;
-    r.empty.should.not == true;
+    r.front.shouldEqual(42);
+    r.shouldNotBeEmpty;
     r.popFront();
-    r.empty.should == true;
+    r.shouldBeEmpty;
 }
 
 /// Return true if `T` is an instance of `std.typecons.Nullable`
@@ -139,10 +137,10 @@ unittest
         return Result!int(1/v);
     }
 
-    reciprocal(1).isSuccess.should == true;
-    reciprocal(1).isFailure.should == false;
-    reciprocal(0).isSuccess.should == false;
-    reciprocal(0).isFailure.should == true;
+    reciprocal(1).isSuccess.shouldBeTrue;
+    reciprocal(1).isFailure.shouldBeFalse;
+    reciprocal(0).isSuccess.shouldBeFalse;
+    reciprocal(0).isFailure.shouldBeTrue;
 }
 
 /**
@@ -189,8 +187,8 @@ template apply(alias fun)
 {
     Result!int success = 42;
     Result!int result = success.apply!(a => a + 1);
-    result.isSuccess.should == true;
-    result.get.should == 43;
+    result.isSuccess.shouldBeTrue;
+    result.get.shouldEqual(43);
 }
 
 @("a function that returns a different type when applying to a success result should return a result of this type")
@@ -199,8 +197,8 @@ template apply(alias fun)
     import std.conv : to;
     Result!int success = 42;
     Result!string result = success.apply!(a => a.to!string);
-    result.isSuccess.should == true;
-    result.get.should == "42";
+    result.isSuccess.shouldBeTrue;
+    result.get.shouldEqual("42");
 }
 
 @("a function when applying to a failure result should return a failure result")
@@ -208,13 +206,14 @@ template apply(alias fun)
 {
     Result!int failure = new Error("");
     Result!int result = failure.apply!(a => a + 1);
-    result.isFailure.should == true;
+    result.isFailure.shouldBeTrue;
 }
 
 @("apply calls can be chained")
 @safe unittest
 {
     import std.math : floor;
+    import std.sumtype : match;
 
     class ParserError : Error
     {
@@ -248,19 +247,22 @@ template apply(alias fun)
     auto success = parse("2")
         .apply!reciprocal
         .apply!floor;
-    
-    success.isSuccess.should == true;
-    success.get.should == 0.;
+
+    success.isSuccess.shouldBeTrue;
+    success.get.shouldEqual(0.);
 
     auto failure = parse("k")
         .apply!reciprocal
         .apply!floor;
-    failure.isFailure.should == true;
+
+    failure.isFailure.shouldBeTrue;
 
     auto otherFailure = parse("0")
         .apply!reciprocal
         .apply!floor;
-    otherFailure.isFailure.should == true;
+
+    otherFailure.isFailure.shouldBeTrue;
+
 }
 
 /**
@@ -288,7 +290,7 @@ if(isResult!T)
 @safe unittest
 {
         Result!int success = 42;
-        success.toNullable.get.should == 42;
+        success.toNullable.get.shouldEqual(42);
 }
 
 @("a failure result should be converted to a null nullable")
@@ -301,7 +303,7 @@ if(isResult!T)
 @safe unittest
 {
     const success = Result!int(42);
-    success.toNullable.get.should == 42;
+    success.toNullable.get.shouldEqual(42);
 }
 
 @("a const success result of nested struct can be converted to nullable")
@@ -318,7 +320,7 @@ if(isResult!T)
     }
 
     const success = Result!S2(S2([S1(0), S1(1)]));
-    success.toNullable.isNull.should.not == true;
+    success.toNullable.isNull.shouldBeFalse;
 }
 
 /// Extract the success value of a success `Result`
@@ -337,14 +339,14 @@ auto get(T)(auto ref T t)
 @safe unittest
 {
     Result!int success = 42;
-    success.get.should == 42;
+    success.get.shouldEqual(42);
 }
 
 @("the value of a const success result can be extracted")
 @safe unittest
 {
     const success = Result!int(42);
-    success.get.should == 42;
+    success.get.shouldEqual(42);
 }
 
 @("the value of a const success result of nested struct can be extracted")
@@ -361,7 +363,7 @@ auto get(T)(auto ref T t)
     }
 
     const success = Result!S2(S2([S1(0), S1(1)]));
-    success.get.values.should == [S1(0), S1(1)];
+    success.get.values.shouldEqual([S1(0), S1(1)]);
 }
 
 /// Extract the success value of a success `Result` or the provided fallback if the `Result` is a failure
@@ -376,12 +378,12 @@ if(isResult!T && is(U : TypeOfSuccess!T))
 @safe unittest
 {
     Result!int failure = new Error("");
-    failure.get(42).should == 42;
+    failure.get(42).shouldEqual(42);
 }
 
 @("a success result when extracting its value providing a fallback should return the value of the result")
 @safe unittest
 {
     Result!int success = 42;
-    assert(success.get(43) == 42);
+    success.get(43).shouldEqual(42);
 }
