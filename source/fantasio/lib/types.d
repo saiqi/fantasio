@@ -3,16 +3,19 @@ module fantasio.lib.types;
 import core.attribute : mustuse;
 import std.typecons : Nullable;
 import std.traits : isMutable,  isAssignable;
+import std.meta : AliasSeq, allSatisfy;
 import std.sumtype : SumType;
 
 version(Have_unit_threaded) { import unit_threaded; }
 else                        { enum ShouldFail; }
 
+private enum bool isError(E) = is(E : Error);
+
 /// A struct that can be either a success of type `T` or a failure of type `Error`
-@mustuse struct Result(T, E = Error)
-if(is(E : Error))
+@mustuse struct Result(T, E ...)
+if(allSatisfy!(isError, AliasSeq!E))
 {
-    SumType!(E, T) payload;
+    SumType!(T, E) payload;
     alias payload this;
 
     private bool _isSuccess;
@@ -20,22 +23,25 @@ if(is(E : Error))
 
     this(T value) pure
     {
-        this.payload = SumType!(E, T)(value);
+        this.payload = SumType!(T, E)(value);
         this._isSuccess = true;
         this._value = this.payload.get;
     }
 
-    this(E e) pure
+    static foreach(ET; AliasSeq!E)
     {
-        this.payload = SumType!(E, T)(e);
-        this._isSuccess = false;
-    }
+        this(ET e) pure
+        {
+            this.payload = SumType!(T, E)(e);
+            this._isSuccess = false;
+        }
 
-    auto ref opAssign()(E error) if(isMutable!T)
-    {
-        (() @trusted {this.payload = error;})();
-        this._isSuccess = false;
-        return this;
+        auto ref opAssign()(ET error) if(isMutable!T)
+        {
+            (() @trusted {this.payload = error;})();
+            this._isSuccess = false;
+            return this;
+        }
     }
 
     auto ref opAssign(U : T)(auto ref U value) if(isMutable!T && isAssignable!(T, U))
@@ -46,7 +52,8 @@ if(is(E : Error))
         return this;
     }
 
-    auto ref opAssign(U : T)(auto ref Result!U value) if(isMutable!T && isAssignable!(T, U))
+    auto ref opAssign(U : T, E ...)(auto ref Result!(U, E) value)
+    if(isMutable!T && isAssignable!(T, U) && allSatisfy!(isError, AliasSeq!E))
     {
         import std.algorithm.mutation : move;
         (() @trusted {this.payload = move(value);})();
@@ -77,9 +84,8 @@ if(is(E : Error))
 @("a result can be assigned")
 @safe nothrow unittest
 {
-    static assert(isResult!(Result!int));
-    auto success = Result!int(42);
-    auto failure = Result!int(new Error(""));
+    auto success = Result!(int, Error)(42);
+    auto failure = Result!(int, Error)(new Error(""));
 
     success = 43;
     success = 42u;
@@ -111,8 +117,8 @@ if(is(E : Error))
 unittest
 {
     import std.range : isInputRange;
-    static assert(isInputRange!(Result!int));
-    Result!int r = 42;
+    static assert(isInputRange!(Result!(int, Error)));
+    Result!(int, Error) r = 42;
     r.front.shouldEqual(42);
     r.shouldNotBeEmpty;
     r.popFront();
@@ -125,10 +131,10 @@ unittest
     import std.range : iota;
     import std.algorithm : map, filter;
 
-    Result!int reciprocal(const int v) pure nothrow @safe
+    Result!(int, Error) reciprocal(const int v) pure nothrow @safe
     {
-        if(v == 0) return Result!int(new Error(""));
-        return Result!int(1/v);
+        if(v == 0) return Result!(int, Error)(new Error(""));
+        return Result!(int, Error)(1/v);
     }
 
     iota(2)
@@ -141,11 +147,38 @@ unittest
 /// Return true if `T` is an instance of `std.typecons.Nullable`
 enum bool isNullable(T) = is(T: Nullable!Arg, Arg);
 
-/// Return true if `T` is an instance of `fantasio.lib.types.Result`
-enum bool isResult(T) = is(T: SumType!(E, Arg), E : Error, Arg);
+private alias TypeOfSuccess(T: SumType!(Arg, E), Arg, E...) = Arg;
+private alias TypeOfFailure(T: SumType!(Arg, E), Arg, E...) = E;
 
-private alias TypeOfSuccess(T: SumType!(E, Arg), E: Error, Arg) = Arg;
-private alias TypeOfFailure(T: SumType!(E, Arg), E: Error, Arg) = E;
+/// Return true if `T` is an instance of `fantasio.lib.types.Result`
+enum bool isResult(T) = is(T: SumType!(Arg, E), Arg, E...);
+
+@("the type of success and failures can be extracted from a result")
+unittest
+{
+    class MyError : Error
+    {
+        pure nothrow @nogc @safe this(string msg, Throwable nextInChain = null)
+        {
+            super(msg, nextInChain);
+        }
+    }
+
+    class MyOtherError : Error
+    {
+        pure nothrow @nogc @safe this(string msg, Throwable nextInChain = null)
+        {
+            super(msg, nextInChain);
+        }
+    }
+
+    alias MyResult = Result!(int, MyError, MyOtherError);
+    pragma(msg, TypeOfSuccess!MyResult);
+
+    static assert(isResult!MyResult);
+    static assert(is(TypeOfSuccess!MyResult == int));
+    static assert(allSatisfy!(isError, TypeOfFailure!MyResult));
+}
 
 /// Return true if `Result` `t` is not an error
 bool isSuccess(T)(auto ref inout T t)
@@ -156,8 +189,8 @@ if(isResult!T)
     alias ST = TypeOfSuccess!T;
 
     return t.match!(
-        (inout Error failure) => false,
-        (inout ST success) => true
+        (inout ST success) => true,
+        _ => false
     );
 }
 
@@ -171,10 +204,10 @@ if(isResult!T)
 @("a result that is a success or a failure can be qualified")
 unittest
 {
-    Result!int reciprocal(int v) pure nothrow @safe
+    Result!(int, Error) reciprocal(int v) pure nothrow @safe
     {
-        if(v == 0) return Result!int(new Error("Division by zero"));
-        return Result!int(1/v);
+        if(v == 0) return Result!(int, Error)(new Error("Division by zero"));
+        return Result!(int, Error)(1/v);
     }
 
     reciprocal(1).isSuccess.shouldBeTrue;
@@ -203,28 +236,34 @@ template apply(alias fun)
     if(isResult!T)
     {
         alias SuccessType = TypeOfSuccess!T;
-        alias FailureType = TypeOfFailure!T;
+        alias FailureTypes = TypeOfFailure!T;
         alias FunType = typeof(unaryFun!fun(SuccessType.init));
 
         static if(isResult!FunType)
         {
-            alias ResultType = Result!(TypeOfSuccess!FunType, Error);
+            alias ResultType = Result!(
+                TypeOfSuccess!FunType,
+                AliasSeq!(FailureTypes, TypeOfFailure!FunType));
 
             return t.match!(
-                (FailureType failure) => ResultType(failure),
                 (SuccessType success) {
                     return fun(success)
                         .match!(
                             (TypeOfSuccess!FunType s) => ResultType(s),
-                            (Error e) => ResultType(e) 
+                            (TypeOfFailure!FunType e) => ResultType(e)
                         );
-                });
+                },
+                (FailureTypes failure) => ResultType(failure));
         }
         else
         {
+            alias ResultType = Result!(FunType, FailureTypes);
             return t.match!(
-                (FailureType failure) => Result!FunType(failure),
-                (SuccessType success) => Result!FunType(fun(success)));
+                (SuccessType success) => ResultType(fun(success)),
+                (FailureTypes failure) {
+                    pragma(msg, typeof(failure).stringof);
+                    return ResultType(failure);
+                });
         }
     }
 }
@@ -232,8 +271,8 @@ template apply(alias fun)
 @("a function when applying to a success result should return a success result")
 @safe unittest
 {
-    Result!int success = 42;
-    Result!int result = success.apply!(a => a + 1);
+    Result!(int, Error) success = 42;
+    Result!(int, Error) result = success.apply!(a => a + 1);
     result.isSuccess.shouldBeTrue;
     result.get.shouldEqual(43);
 }
@@ -242,8 +281,8 @@ template apply(alias fun)
 @safe unittest
 {
     import std.conv : to;
-    Result!int success = 42;
-    Result!string result = success.apply!(a => a.to!string);
+    Result!(int, Error) success = 42;
+    Result!(string, Error) result = success.apply!(a => a.to!string);
     result.isSuccess.shouldBeTrue;
     result.get.shouldEqual("42");
 }
@@ -251,8 +290,8 @@ template apply(alias fun)
 @("a function when applying to a failure result should return a failure result")
 @safe unittest
 {
-    Result!int failure = new Error("");
-    Result!int result = failure.apply!(a => a + 1);
+    Result!(int, Error) failure = new Error("");
+    Result!(int, Error) result = failure.apply!(a => a + 1);
     result.isFailure.shouldBeTrue;
 }
 
@@ -303,6 +342,10 @@ template apply(alias fun)
         .apply!floor;
 
     failure.isFailure.shouldBeTrue;
+    failure.match!(
+        (ParserError e) => "ParserError",
+        (ZeroDivisionError e) => "ZeroDivisionError",
+        (string v) => v).shouldEqual("ParserError");
 
     auto otherFailure = parse("0")
         .apply!reciprocal
@@ -336,20 +379,20 @@ if(isResult!T)
 @("a success result should be converted to a non-null nullable")
 @safe unittest
 {
-        Result!int success = 42;
+        Result!(int, Error) success = 42;
         success.toNullable.get.shouldEqual(42);
 }
 
 @("a failure result should be converted to a null nullable")
 @safe unittest {
-    Result!int failure = new Error("");
+    Result!(int, Error) failure = new Error("");
     failure.toNullable.isNull.should == true;
 }
 
 @("a const success result can be converted to nullable")
 @safe unittest
 {
-    const success = Result!int(42);
+    const success = Result!(int, Error)(42);
     success.toNullable.get.shouldEqual(42);
 }
 
@@ -366,7 +409,7 @@ if(isResult!T)
         S1[] values;
     }
 
-    const success = Result!S2(S2([S1(0), S1(1)]));
+    const success = Result!(S2, Error)(S2([S1(0), S1(1)]));
     success.toNullable.isNull.shouldBeFalse;
 }
 
@@ -385,14 +428,14 @@ auto get(T)(auto ref T t)
 @("the value of a success result can be extracted")
 @safe unittest
 {
-    Result!int success = 42;
+    Result!(int, Error) success = 42;
     success.get.shouldEqual(42);
 }
 
 @("the value of a const success result can be extracted")
 @safe unittest
 {
-    const success = Result!int(42);
+    const success = Result!(int, Error)(42);
     success.get.shouldEqual(42);
 }
 
@@ -409,7 +452,7 @@ auto get(T)(auto ref T t)
         S1[] values;
     }
 
-    const success = Result!S2(S2([S1(0), S1(1)]));
+    const success = Result!(S2, Error)(S2([S1(0), S1(1)]));
     success.get.values.shouldEqual([S1(0), S1(1)]);
 }
 
@@ -424,13 +467,13 @@ if(isResult!T && is(U : TypeOfSuccess!T))
 @("a failure result when extracting its value providing a fallback should return the fallback")
 @safe unittest
 {
-    Result!int failure = new Error("");
+    Result!(int, Error) failure = new Error("");
     failure.get(42).shouldEqual(42);
 }
 
 @("a success result when extracting its value providing a fallback should return the value of the result")
 @safe unittest
 {
-    Result!int success = 42;
+    Result!(int, Error) success = 42;
     success.get(43).shouldEqual(42);
 }
