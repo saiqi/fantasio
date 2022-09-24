@@ -173,7 +173,6 @@ unittest
     }
 
     alias MyResult = Result!(int, MyError, MyOtherError);
-    pragma(msg, TypeOfSuccess!MyResult);
 
     static assert(isResult!MyResult);
     static assert(is(TypeOfSuccess!MyResult == int));
@@ -253,17 +252,14 @@ template apply(alias fun)
                             (TypeOfFailure!FunType e) => ResultType(e)
                         );
                 },
-                (FailureTypes failure) => ResultType(failure));
+                failure => ResultType(failure));
         }
         else
         {
             alias ResultType = Result!(FunType, FailureTypes);
             return t.match!(
                 (SuccessType success) => ResultType(fun(success)),
-                (FailureTypes failure) {
-                    pragma(msg, typeof(failure).stringof);
-                    return ResultType(failure);
-                });
+                failure => ResultType(failure));
         }
     }
 }
@@ -336,6 +332,10 @@ template apply(alias fun)
 
     success.isSuccess.shouldBeTrue;
     success.get.shouldEqual(0.);
+    success.match!(
+        (ParserError e) => "ParserError",
+        (ZeroDivisionError e) => "ZeroDivisionError",
+        (double v) => "NoError").shouldEqual("NoError");
 
     auto failure = parse("k")
         .apply!reciprocal
@@ -345,13 +345,17 @@ template apply(alias fun)
     failure.match!(
         (ParserError e) => "ParserError",
         (ZeroDivisionError e) => "ZeroDivisionError",
-        (string v) => v).shouldEqual("ParserError");
+        (double v) => "NoError").shouldEqual("ParserError");
 
     auto otherFailure = parse("0")
         .apply!reciprocal
         .apply!floor;
 
     otherFailure.isFailure.shouldBeTrue;
+    otherFailure.match!(
+        (ParserError e) => "ParserError",
+        (ZeroDivisionError e) => "ZeroDivisionError",
+        (double v) => "NoError").shouldEqual("ZeroDivisionError");
 
 }
 
