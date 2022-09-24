@@ -151,9 +151,20 @@ private alias TypeOfSuccess(T: SumType!(Arg, E), Arg, E...) = Arg;
 private alias TypeOfFailure(T: SumType!(Arg, E), Arg, E...) = E;
 
 /// Return true if `T` is an instance of `fantasio.lib.types.Result`
-enum bool isResult(T) = is(T: SumType!(Arg, E), Arg, E...);
+template isResult(T)
+{
+    static if(is(T: SumType!(Arg, E), Arg, E...))
+    {
+        static if(is(TypeOfFailure!T))
+            enum bool isResult = allSatisfy!(isError, AliasSeq!(TypeOfFailure!T));
+        else
+            enum bool isResult = false;
+    }
+    else
+        enum bool isResult = false;
+}
 
-@("the type of success and failures can be extracted from a result")
+@("a result has an interface and the type of success and failures can be extracted")
 unittest
 {
     class MyError : Error
@@ -176,7 +187,11 @@ unittest
 
     static assert(isResult!MyResult);
     static assert(is(TypeOfSuccess!MyResult == int));
+    alias Expected = AliasSeq!(MyError, MyOtherError);
+    static assert(is(TypeOfFailure!MyResult == Expected));
     static assert(allSatisfy!(isError, TypeOfFailure!MyResult));
+
+    static assert(!isResult!(SumType!(int, double)));
 }
 
 /// Return true if `Result` `t` is not an error
