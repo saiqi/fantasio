@@ -94,7 +94,7 @@ if(allSatisfy!(isError, AliasSeq!E))
 }
 
 @("a result can match on user defined error")
-@safe unittest
+@safe pure unittest
 {
     import std.sumtype : match;
 
@@ -126,7 +126,7 @@ unittest
 }
 
 @("range algorithms can be applied to result")
-@safe unittest
+@safe pure unittest
 {
     import std.range : iota;
     import std.algorithm : map, filter;
@@ -165,7 +165,7 @@ template isResult(T)
 }
 
 @("a result has an interface and the type of success and failures can be extracted")
-unittest
+@safe pure unittest
 {
     class MyError : Error
     {
@@ -216,7 +216,7 @@ if(isResult!T)
 }
 
 @("a result that is a success or a failure can be qualified")
-unittest
+@safe pure unittest
 {
     Result!(int, Error) reciprocal(int v) pure nothrow @safe
     {
@@ -280,7 +280,7 @@ template apply(alias fun)
 }
 
 @("a function when applying to a success result should return a success result")
-@safe unittest
+@safe pure unittest
 {
     Result!(int, Error) success = 42;
     Result!(int, Error) result = success.apply!(a => a + 1);
@@ -289,7 +289,7 @@ template apply(alias fun)
 }
 
 @("a function that returns a different type when applying to a success result should return a result of this type")
-@safe unittest
+@safe pure unittest
 {
     import std.conv : to;
     Result!(int, Error) success = 42;
@@ -299,7 +299,7 @@ template apply(alias fun)
 }
 
 @("a function when applying to a failure result should return a failure result")
-@safe unittest
+@safe pure unittest
 {
     Result!(int, Error) failure = new Error("");
     Result!(int, Error) result = failure.apply!(a => a + 1);
@@ -307,7 +307,7 @@ template apply(alias fun)
 }
 
 @("apply calls can be chained")
-@safe unittest
+@safe pure unittest
 {
     import std.math : floor;
     import std.sumtype : match;
@@ -396,27 +396,27 @@ if(isResult!T)
 }
 
 @("a success result should be converted to a non-null nullable")
-@safe unittest
+@safe pure unittest
 {
         Result!(int, Error) success = 42;
         success.toNullable.get.shouldEqual(42);
 }
 
 @("a failure result should be converted to a null nullable")
-@safe unittest {
+@safe pure unittest {
     Result!(int, Error) failure = new Error("");
     failure.toNullable.isNull.should == true;
 }
 
 @("a const success result can be converted to nullable")
-@safe unittest
+@safe pure unittest
 {
     const success = Result!(int, Error)(42);
     success.toNullable.get.shouldEqual(42);
 }
 
 @("a const success result of nested struct can be converted to nullable")
-@safe unittest
+@safe pure unittest
 {
     struct S1
     {
@@ -445,21 +445,21 @@ auto get(T)(auto ref T t)
 }
 
 @("the value of a success result can be extracted")
-@safe unittest
+@safe pure unittest
 {
     Result!(int, Error) success = 42;
     success.get.shouldEqual(42);
 }
 
 @("the value of a const success result can be extracted")
-@safe unittest
+@safe pure unittest
 {
     const success = Result!(int, Error)(42);
     success.get.shouldEqual(42);
 }
 
 @("the value of a const success result of nested struct can be extracted")
-@safe unittest
+@safe pure unittest
 {
     struct S1
     {
@@ -484,14 +484,14 @@ if(isResult!T && is(U : TypeOfSuccess!T))
 }
 
 @("a failure result when extracting its value providing a fallback should return the fallback")
-@safe unittest
+@safe pure unittest
 {
     Result!(int, Error) failure = new Error("");
     failure.get(42).shouldEqual(42);
 }
 
 @("a success result when extracting its value providing a fallback should return the value of the result")
-@safe unittest
+@safe pure unittest
 {
     Result!(int, Error) success = 42;
     success.get(43).shouldEqual(42);
