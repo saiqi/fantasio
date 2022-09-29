@@ -231,16 +231,17 @@ if(isResult!T)
 }
 
 /**
-The counterpart of `std.typecons.apply` for `fantasio.lib.types.Result`.
-Unpack the content of a `Result`, perform an operation and packs it again.
-
-Params:
-    t = a `Result`
-    fun = a function operating on the valid content of the result
-
-Returns:
-    `Result!(typeof(fun((TypeOfSuccess!T).init)))`
-*/
+ * The counterpart of `std.typecons.apply` for `fantasio.lib.types.Result`.
+ * Unpack the content of a `Result`, perform an operation and packs it again.
+ * If `fun` returns a `Result` of an error type,
+ * the returned `Result` accumulates this error type with the parameter's error type
+ * Params:
+ *   t = a `Result`
+ *   fun = a function operating on the valid content of the result
+ *
+ * Returns:
+ *   `Result!(typeof(fun(T.init)), Error ...)`
+ */
 template apply(alias fun)
 {
     import std.functional : unaryFun;
