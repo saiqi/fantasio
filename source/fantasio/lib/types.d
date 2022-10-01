@@ -82,15 +82,30 @@ if(allSatisfy!(isError, AliasSeq!E))
 }
 
 @("a result can be assigned")
-@safe nothrow unittest
+@safe unittest
 {
+    import std.algorithm : map;
     auto success = Result!(int, Error)(42);
+    success.get.shouldEqual(42);
+
     auto failure = Result!(int, Error)(new Error(""));
+    failure.isFailure.shouldBeTrue;
 
     success = 43;
+    success.get.shouldEqual(43);
+
     success = 42u;
+    success.get.shouldEqual(42u);
+
     success = new Error("");
+    success.isFailure.shouldBeTrue;
+
     success = failure;
+    success.isFailure.shouldBeTrue;
+
+    auto new_ = Result!(int, Error)(42);
+    success = new_;
+    success.get.shouldEqual(42);
 }
 
 @("a result can match on user defined error")
