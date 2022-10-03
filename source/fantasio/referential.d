@@ -10,6 +10,7 @@ else                        { enum ShouldFail; }
 private enum allowedPattern = ctRegex!"[A-Za-z0-9_\\-]+";
 private enum idPattern = ctRegex!"ref:([A-Za-z0-9_\\-]+):([A-Za-z0-9_\\-]+):([A-Za-z0-9_\\-]+)";
 
+/// Error representing referential ids formatting issues
 class IdFormatError : Error
 {
     pure nothrow @nogc @safe this(string msg, Throwable nextInChain = null)
