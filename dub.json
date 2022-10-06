@@ -16,6 +16,8 @@
 		{
 			"name": "unittest",
 			"targetType": "executable",
+			"targetName": "ut",
+			"sourcePaths": ["tests"],
             "preBuildCommands": ["$DUB run --compiler=$$DC unit-threaded -c gen_ut_main -- -f bin/ut.d -d $DUB"],
             "mainSourceFile": "bin/ut.d",
 			"excludedSourceFiles": ["source/app.d"],

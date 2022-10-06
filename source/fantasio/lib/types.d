@@ -6,9 +6,6 @@ import std.traits : isMutable,  isAssignable;
 import std.meta : AliasSeq, allSatisfy;
 import std.sumtype : SumType;
 
-version(Have_unit_threaded) { import unit_threaded; }
-else                        { enum ShouldFail; }
-
 private enum bool isError(E) = is(E : Error);
 
 /// A struct that can be either a success of type `T` or a failure of type `Error`
@@ -81,84 +78,6 @@ if(allSatisfy!(isError, AliasSeq!E))
     }
 }
 
-@("a result can be assigned")
-@safe unittest
-{
-    import std.algorithm : map;
-    auto success = Result!(int, Error)(42);
-    success.get.shouldEqual(42);
-
-    auto failure = Result!(int, Error)(new Error(""));
-    failure.isFailure.shouldBeTrue;
-
-    success = 43;
-    success.get.shouldEqual(43);
-
-    success = 42u;
-    success.get.shouldEqual(42u);
-
-    success = new Error("");
-    success.isFailure.shouldBeTrue;
-
-    success = failure;
-    success.isFailure.shouldBeTrue;
-
-    auto new_ = Result!(int, Error)(42);
-    success = new_;
-    success.get.shouldEqual(42);
-}
-
-@("a result can match on user defined error")
-@safe pure unittest
-{
-    import std.sumtype : match;
-
-    class MyError : Error
-    {
-        pure nothrow @nogc @safe this(string msg, Throwable nextInChain = null)
-        {
-            super(msg, nextInChain);
-        }
-    }
-
-    auto failure = Result!(int, MyError)(new MyError(""));
-    failure.match!(
-        (MyError e) => "MyError",
-        _ => "NoError"
-    ).shouldEqual("MyError");
-}
-
-@("results are ranges")
-unittest
-{
-    import std.range : isInputRange;
-    static assert(isInputRange!(Result!(int, Error)));
-    Result!(int, Error) r = 42;
-    r.front.shouldEqual(42);
-    r.shouldNotBeEmpty;
-    r.popFront();
-    r.shouldBeEmpty;
-}
-
-@("range algorithms can be applied to result")
-@safe pure unittest
-{
-    import std.range : iota;
-    import std.algorithm : map, filter;
-
-    Result!(int, Error) reciprocal(const int v) pure nothrow @safe
-    {
-        if(v == 0) return Result!(int, Error)(new Error(""));
-        return Result!(int, Error)(1/v);
-    }
-
-    iota(2)
-        .map!reciprocal
-        .filter!isSuccess
-        .map!get
-        .shouldEqual([1]);
-}
-
 /// Return true if `T` is an instance of `std.typecons.Nullable`
 enum bool isNullable(T) = is(T: Nullable!Arg, Arg);
 
@@ -177,36 +96,6 @@ template isResult(T)
     }
     else
         enum bool isResult = false;
-}
-
-@("a result has an interface and the type of success and failures can be extracted")
-@safe pure unittest
-{
-    class MyError : Error
-    {
-        pure nothrow @nogc @safe this(string msg, Throwable nextInChain = null)
-        {
-            super(msg, nextInChain);
-        }
-    }
-
-    class MyOtherError : Error
-    {
-        pure nothrow @nogc @safe this(string msg, Throwable nextInChain = null)
-        {
-            super(msg, nextInChain);
-        }
-    }
-
-    alias MyResult = Result!(int, MyError, MyOtherError);
-
-    static assert(isResult!MyResult);
-    static assert(is(TypeOfSuccess!MyResult == int));
-    alias Expected = AliasSeq!(MyError, MyOtherError);
-    static assert(is(TypeOfFailure!MyResult == Expected));
-    static assert(allSatisfy!(isError, TypeOfFailure!MyResult));
-
-    static assert(!isResult!(SumType!(int, double)));
 }
 
 /// Return true if `Result` `t` is not an error
@@ -228,21 +117,6 @@ bool isFailure(T)(auto ref inout T t)
 if(isResult!T)
 {
     return !isSuccess(t);
-}
-
-@("a result that is a success or a failure can be qualified")
-@safe pure unittest
-{
-    Result!(int, Error) reciprocal(int v) pure nothrow @safe
-    {
-        if(v == 0) return Result!(int, Error)(new Error("Division by zero"));
-        return Result!(int, Error)(1/v);
-    }
-
-    reciprocal(1).isSuccess.shouldBeTrue;
-    reciprocal(1).isFailure.shouldBeFalse;
-    reciprocal(0).isSuccess.shouldBeFalse;
-    reciprocal(0).isFailure.shouldBeTrue;
 }
 
 /**
@@ -295,101 +169,6 @@ template apply(alias fun)
     }
 }
 
-@("a function when applying to a success result should return a success result")
-@safe pure unittest
-{
-    Result!(int, Error) success = 42;
-    Result!(int, Error) result = success.apply!(a => a + 1);
-    result.isSuccess.shouldBeTrue;
-    result.get.shouldEqual(43);
-}
-
-@("a function that returns a different type when applying to a success result should return a result of this type")
-@safe pure unittest
-{
-    import std.conv : to;
-    Result!(int, Error) success = 42;
-    Result!(string, Error) result = success.apply!(a => a.to!string);
-    result.isSuccess.shouldBeTrue;
-    result.get.shouldEqual("42");
-}
-
-@("a function when applying to a failure result should return a failure result")
-@safe pure unittest
-{
-    Result!(int, Error) failure = new Error("");
-    Result!(int, Error) result = failure.apply!(a => a + 1);
-    result.isFailure.shouldBeTrue;
-}
-
-@("apply calls can be chained")
-@safe pure unittest
-{
-    import std.math : floor;
-    import std.sumtype : match;
-
-    class ParserError : Error
-    {
-        pure nothrow @nogc @safe this(string msg, Throwable nextInChain = null)
-        {
-            super(msg, nextInChain);
-        }
-    }
-
-    class ZeroDivisionError : Error
-    {
-        pure nothrow @nogc @safe this(string msg, Throwable nextInChain = null)
-        {
-            super(msg, nextInChain);
-        }
-    }
-
-    Result!(int, ParserError) parse(string s) nothrow
-    {
-        import std.conv : to;
-        scope(failure) return Result!(int, ParserError)(new ParserError(("Parsing of " ~ s ~ " failed")));
-        return Result!(int, ParserError)(s.to!int);
-    }
-
-    Result!(double, ZeroDivisionError) reciprocal(int i) nothrow
-    {
-        if(i == 0) return Result!(double, ZeroDivisionError)(new ZeroDivisionError("Division by zero"));
-        return Result!(double, ZeroDivisionError)(1/i);
-    }
-
-    auto success = parse("2")
-        .apply!reciprocal
-        .apply!floor;
-
-    success.isSuccess.shouldBeTrue;
-    success.get.shouldEqual(0.);
-    success.match!(
-        (ParserError e) => "ParserError",
-        (ZeroDivisionError e) => "ZeroDivisionError",
-        (double v) => "NoError").shouldEqual("NoError");
-
-    auto failure = parse("k")
-        .apply!reciprocal
-        .apply!floor;
-
-    failure.isFailure.shouldBeTrue;
-    failure.match!(
-        (ParserError e) => "ParserError",
-        (ZeroDivisionError e) => "ZeroDivisionError",
-        (double v) => "NoError").shouldEqual("ParserError");
-
-    auto otherFailure = parse("0")
-        .apply!reciprocal
-        .apply!floor;
-
-    otherFailure.isFailure.shouldBeTrue;
-    otherFailure.match!(
-        (ParserError e) => "ParserError",
-        (ZeroDivisionError e) => "ZeroDivisionError",
-        (double v) => "NoError").shouldEqual("ZeroDivisionError");
-
-}
-
 /**
 Convert a `Result` to `Nullable`
 Params:
@@ -411,43 +190,6 @@ if(isResult!T)
     );
 }
 
-@("a success result should be converted to a non-null nullable")
-@safe pure unittest
-{
-        Result!(int, Error) success = 42;
-        success.toNullable.get.shouldEqual(42);
-}
-
-@("a failure result should be converted to a null nullable")
-@safe pure unittest {
-    Result!(int, Error) failure = new Error("");
-    failure.toNullable.isNull.should == true;
-}
-
-@("a const success result can be converted to nullable")
-@safe pure unittest
-{
-    const success = Result!(int, Error)(42);
-    success.toNullable.get.shouldEqual(42);
-}
-
-@("a const success result of nested struct can be converted to nullable")
-@safe pure unittest
-{
-    struct S1
-    {
-        int value;
-    }
-
-    struct S2
-    {
-        S1[] values;
-    }
-
-    const success = Result!(S2, Error)(S2([S1(0), S1(1)]));
-    success.toNullable.isNull.shouldBeFalse;
-}
-
 /// Extract the success value of a success `Result`
 auto get(T)(auto ref T t)
 {
@@ -460,55 +202,10 @@ auto get(T)(auto ref T t)
     );
 }
 
-@("the value of a success result can be extracted")
-@safe pure unittest
-{
-    Result!(int, Error) success = 42;
-    success.get.shouldEqual(42);
-}
-
-@("the value of a const success result can be extracted")
-@safe pure unittest
-{
-    const success = Result!(int, Error)(42);
-    success.get.shouldEqual(42);
-}
-
-@("the value of a const success result of nested struct can be extracted")
-@safe pure unittest
-{
-    struct S1
-    {
-        int value;
-    }
-
-    struct S2
-    {
-        S1[] values;
-    }
-
-    const success = Result!(S2, Error)(S2([S1(0), S1(1)]));
-    success.get.values.shouldEqual([S1(0), S1(1)]);
-}
-
 /// Extract the success value of a success `Result` or the provided fallback if the `Result` is a failure
 inout(U) get(T, U)(auto ref T t, inout(U) fallback)
 if(isResult!T && is(U : TypeOfSuccess!T))
 {
     if(t.isFailure) return fallback;
     return get(t);
-}
-
-@("a failure result when extracting its value providing a fallback should return the fallback")
-@safe pure unittest
-{
-    Result!(int, Error) failure = new Error("");
-    failure.get(42).shouldEqual(42);
-}
-
-@("a success result when extracting its value providing a fallback should return the value of the result")
-@safe pure unittest
-{
-    Result!(int, Error) success = 42;
-    success.get(43).shouldEqual(42);
 }
