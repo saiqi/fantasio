@@ -33,6 +33,22 @@ import fantasio.lib.xml;
     }
 }
 
+@("a fragment of an xml text can be decoded")
+@system unittest
+{
+    @XmlRoot("foo")
+    static struct Foo
+    {
+        @XmlAttr("id")
+        string id;
+    }
+
+    auto r = "<root><inner><foo id=\"0\"/></inner><inner><foo id=\"1\"/></inner></root>"
+        .decodeXmlAs!Foo;
+    r.shouldNotBeEmpty;
+    r.shouldEqual([Foo("0"), Foo("1")]);
+}
+
 @("a target struct can have primitive typed field from either attributes or text")
 @system unittest
 {
