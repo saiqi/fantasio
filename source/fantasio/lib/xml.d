@@ -113,7 +113,6 @@ private:
 
     Entities _entities;
     S _current;
-    bool _primed;
 
     this(Entities entities)
     {
@@ -123,12 +122,9 @@ private:
 
     void prime()
     {
-        if(_primed) return;
-
         while(!isNextEntityReached)
             this._entities.popFront();
 
-        _primed = true;
         buildCurrent();
     }
 
