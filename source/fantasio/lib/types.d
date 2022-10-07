@@ -80,6 +80,21 @@ if(allSatisfy!(isError, AliasSeq!E))
 
 /// Return true if `T` is an instance of `std.typecons.Nullable`
 enum bool isNullable(T) = is(T: Nullable!Arg, Arg);
+alias NullableOf(T: Nullable!Arg, Arg) = Arg;
+
+/**
+  * Apply a compile-time predicate with arguments `Args` to a type `T`.
+  * If `T` is a `std.typecons.Nullable` the predicate will be applied to the corresponding underlying type
+  * (`ST` from `Nullable!ST`).
+  * Otherwise, the predicate will be applied on `T`
+  */
+template unpack(T, alias pred, Args ...)
+{
+    static if(isNullable!T)
+        enum unpack = pred!(NullableOf!T, Args);
+    else
+        enum unpack = pred!(T, Args);
+}
 
 private alias TypeOfSuccess(T: SumType!(Arg, E), Arg, E...) = Arg;
 private alias TypeOfFailure(T: SumType!(Arg, E), Arg, E...) = E;
