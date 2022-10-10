@@ -148,8 +148,15 @@ unittest
     Result!(int, ParserError) parse(string s) nothrow
     {
         import std.conv : to;
-        scope(failure) return Result!(int, ParserError)(new ParserError(("Parsing of " ~ s ~ " failed")));
-        return Result!(int, ParserError)(s.to!int);
+
+        try
+        {
+            return Result!(int, ParserError)(s.to!int);
+        }
+        catch(Exception e)
+        {
+            return Result!(int, ParserError)(new ParserError(("Parsing of " ~ s ~ " failed")));
+        }
     }
 
     Result!(double, ZeroDivisionError) reciprocal(int i) nothrow
