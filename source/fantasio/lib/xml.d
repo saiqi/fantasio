@@ -196,11 +196,19 @@ private:
 
         bool isLeaf = path.length == 1;
 
+        // debug {
+        //     import std.stdio : writeln;
+        //     import std.string : join;
+        //     writeln(typeof(this).stringof ~ " " ~ ST.stringof ~ " " ~ path.join("/"));
+        // }
+
+        if(!isLeaf) path = path[1 .. $];
+
         static if(isDecodedRange!ST)
         {
-
+            // if(isLeaf) source = ST(this._entities.save);
         }
-        else static if(isArray!ST)
+        else  static if(isArray!ST)
         {
             alias ET = ElementType!ST;
 
@@ -212,8 +220,6 @@ private:
             }
             else
             {
-                path = path[1 .. $];
-
                 static foreach (m; allChildren!ET)
                 {{
                     if(elementName!(ET, m) == path[0])
@@ -238,8 +244,6 @@ private:
                 setLeafValue(source);
             else
             {
-                path = path[1 .. $];
-
                 static foreach (m; unpack!(ST, allChildren))
                 {{
                     if(unpack!(ST, elementName, m) == path[0])

@@ -363,3 +363,24 @@ import fantasio.lib.xml;
 
     foo.shouldEqual(Foo([Bar([Baz("42"), Baz("43")]), Bar([Baz("44"), Baz("45")])]));
 }
+
+// @("a target struct can have a lazy range field")
+// @system unittest
+// {
+//     @XmlRoot("bar")
+//     static struct Bar
+//     {
+//         @XmlAttr("id")
+//         string id;
+//     }
+
+//     @XmlRoot("foo")
+//     static struct Foo
+//     {
+//         @XmlElementList("bar")
+//         DecodedXml!(Bar, string) bars;
+//     }
+
+//     Foo foo = "<foo><bar id=\"42\"/><bar id=\"43\"/></foo>".decodeXmlAs!Foo.front;
+//     foo.bars.shouldEqual([Bar("42"), Bar("43")]);
+// }

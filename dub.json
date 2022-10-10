@@ -1,29 +1,35 @@
 {
-	"authors": [
-		"saiqi"
-	],
-	"copyright": "Copyright © 2022, saiqi",
-	"dependencies": {
-		"dxml": "~>0.4.3"
-	},
-	"description": "A lightweight ETL solution",
-	"license": "MIT",
-	"name": "fantasio",
-	"targetType": "executable",
-	"targetPath": "bin",
-	"configurations": [
-		{"name": "executable"},
-		{
-			"name": "unittest",
-			"targetType": "executable",
-			"targetName": "ut",
-			"sourcePaths": ["tests"],
+    "authors": [
+        "saiqi"
+    ],
+    "copyright": "Copyright © 2022, saiqi",
+    "dependencies": {
+        "dxml": "~>0.4.3"
+    },
+    "description": "A lightweight ETL solution",
+    "license": "MIT",
+    "name": "fantasio",
+    "targetType": "executable",
+    "targetPath": "bin",
+    "configurations": [
+        {
+            "name": "executable"
+        },
+        {
+            "name": "executable-debug",
+            "dflags": ["-gc"]
+        },
+        {
+            "name": "unittest",
+            "targetType": "executable",
+            "targetName": "ut",
+            "sourcePaths": ["tests"],
             "preBuildCommands": ["$DUB run --compiler=$$DC unit-threaded -c gen_ut_main -- -f bin/ut.d -d $DUB"],
             "mainSourceFile": "bin/ut.d",
-			"excludedSourceFiles": ["source/app.d"],
+            "excludedSourceFiles": ["source/app.d"],
             "dependencies": {
                 "unit-threaded": "*"
             }
-		}
-	]
+        }
+    ]
 }
