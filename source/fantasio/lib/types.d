@@ -85,7 +85,7 @@ alias NullableOf(T: Nullable!Arg, Arg) = Arg;
 /**
   * Apply a compile-time predicate with arguments `Args` to a type `T`.
   * If `T` is a `std.typecons.Nullable` the predicate will be applied to the corresponding underlying type
-  * (`ST` from `Nullable!ST`).
+  * (i.e. `ST` from `Nullable!ST`).
   * Otherwise, the predicate will be applied on `T`
   */
 template unpack(T, alias pred, Args ...)
@@ -113,7 +113,7 @@ template isResult(T)
         enum bool isResult = false;
 }
 
-/// Return true if `Result` `t` is not an error
+/// Return true if a `Result` `t` is not an error
 bool isSuccess(T)(auto ref inout T t)
 if(isResult!T)
 {
@@ -127,7 +127,7 @@ if(isResult!T)
     );
 }
 
-/// Return true if `Result` `t` is an error
+/// Return true if a `Result` `t` is an error
 bool isFailure(T)(auto ref inout T t)
 if(isResult!T)
 {

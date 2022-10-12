@@ -99,30 +99,38 @@ enum bool hasNestedLazyList(T) =
 }();
 
 public:
+
+/// UDA to define root node tag's name
 struct XmlRoot
 {
     string tagName;
 }
 
+/// UDA to define a single child node tag's name
 struct XmlElement
 {
     string tagName;
 }
 
+/// UDA to define a multiple children nodes tag's name
 struct XmlElementList
 {
     string tagName;
 }
 
+/// UDA to define attribute node where the data should be decoded
 struct XmlAttr
 {
     string name;
 }
 
+/// UDA to define that the data should be decoded from the node's text
 enum XmlText;
 
+/// UDA to define that all the current attributes should be decoded as an associative array
 enum XmlAllAttrs;
 
+///
 class XMLDecodingException : Exception
 {
     this(string msg, string file = __FILE__, size_t line = __LINE__) @safe pure
@@ -131,8 +139,15 @@ class XMLDecodingException : Exception
     }
 }
 
+/// Alias of `DecodedXml` to improve semantic when users define a field as a lazy range
 alias LazyList = DecodedXml;
 
+/**
+ * A forward range that iterates over a `dxml.parser.EntityRange`
+ * to build element of given type `S`.
+ * Constructor is private, use `decodeXmlAs` instead
+ * Throws: XMLDecodingException when a non optional field (not defined as `Nullable`) is missing
+ */
 struct DecodedXml(S, T) if(isDecodable!T && hasUDA!(S, XmlRoot))
 {
     import dxml.parser : EntityType;
@@ -341,17 +356,20 @@ private:
 
 public:
 
+    /// ditto
     bool empty() inout
     {
         return this._entities.empty || this._endOfFragment;
     }
 
+    /// ditto
     ref S front()
     {
         assert(!empty, "Fetch the front from an empty range");
         return this._current;
     }
 
+    /// ditto
     void popFront()
     {
         assert(!empty, "Pop the front from an empty range");
@@ -370,6 +388,7 @@ public:
         buildCurrent();
     }
 
+    /// ditto
     auto save()
     {
         auto retval = this;
@@ -378,9 +397,26 @@ public:
     }
 }
 
-DecodedXml!(S, T) decodeXmlAs(S, T)(T xmlText)
-if(isDecodable!T && hasUDA!(S, XmlRoot))
+/// Functions that build `DecodedXml` from a range of characters
+template decodeXmlAs(alias S)
 {
-    auto entities = parseXML!(simpleXML, T)(xmlText);
-    return DecodedXml!(S, T)(entities);
+    static if(is(S!(char[])))
+    {
+        ///ditto
+        DecodedXml!(S!T, T) decodeXmlAs(T)(T xmlText) if(isDecodable!T)
+        {
+            auto entities = parseXML!(simpleXML, T)(xmlText);
+            return DecodedXml!(S!T, T)(entities);
+        }
+    }
+    else
+    {
+        /// ditto
+        DecodedXml!(S, T) decodeXmlAs(T)(T xmlText) if(isDecodable!T)
+        {
+            auto entities = parseXML!(simpleXML, T)(xmlText);
+            return DecodedXml!(S, T)(entities);
+        }
+
+    }
 }

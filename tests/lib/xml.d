@@ -471,8 +471,6 @@ import fantasio.lib.xml;
 @("a range of decoded struct can have a nested lazy range field")
 @system unittest
 {
-    import std.range : walkLength;
-
     @XmlRoot("bar")
     static struct Bar
     {
@@ -514,3 +512,31 @@ import fantasio.lib.xml;
     foos.front.bars.shouldEqual([Bar(46u), Bar(47u), Bar(48u), Bar(49u)]);
 }
 
+@("A decoded struct having lazy ranges can be decoded from a range of characters")
+@system unittest
+{
+    import std.algorithm : joiner;
+
+    @XmlRoot("bar")
+    static struct Bar
+    {
+        @XmlAttr("id")
+        uint id;
+    }
+
+    @XmlRoot("foo")
+    static struct Foo(R)
+    {
+        @XmlAttr("id")
+        uint id;
+
+        @XmlElementList("bar")
+        LazyList!(Bar, R) bars;
+    }
+
+    auto foos = ["<foo id=\"1\"><bar id=\"42\"", "/><bar id=\"43\"/></foo>"]
+        .joiner
+        .decodeXmlAs!Foo;
+    foos.front.id.shouldEqual(1u);
+    foos.front.bars.shouldEqual([Bar(42u), Bar(43u)]);
+}
