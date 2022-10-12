@@ -40,16 +40,16 @@ import fantasio.lib.xml;
     static struct Foo
     {
         @XmlAttr("id")
-        string id;
+        uint id;
     }
 
-    auto r = "<root><inner><foo id=\"0\"/></inner><inner><foo id=\"1\"/></inner></root>"
+    auto r = "<root><foo id=\"1\"/><foo id=\"2\"/></root>"
         .decodeXmlAs!Foo;
     r.shouldNotBeEmpty;
-    r.shouldEqual([Foo("0"), Foo("1")]);
+    r.shouldEqual([Foo(1u), Foo(2u)]);
 }
 
-@("a target struct can have primitive typed field from either attributes or text")
+@("a decoded struct can have primitive typed field from either attributes or text")
 @system unittest
 {
     @XmlRoot("foo")
@@ -85,7 +85,7 @@ import fantasio.lib.xml;
     "<foo>52.6</foo>".decodeXmlAs!Foo.shouldThrow;
 }
 
-@("a target struct can have a nullable-primitive field")
+@("a decoded struct can have a nullable-primitive field")
 @system unittest
 {
     @XmlRoot("foo")
@@ -109,7 +109,7 @@ import fantasio.lib.xml;
     other.id.isNull.shouldBeTrue;
 }
 
-@("a target struct can have a nested struct field")
+@("a decoded struct can have a nested struct field")
 @system unittest
 {
     @XmlRoot("bar")
@@ -152,7 +152,7 @@ import fantasio.lib.xml;
     }));
 }
 
-@("a target struct can have a nested nullbale struct field")
+@("a decoded struct can have a nested nullbale struct field")
 @system unittest
 {
     @XmlRoot("bar")
@@ -181,7 +181,7 @@ import fantasio.lib.xml;
     }
 }
 
-@("a target struct can have a nested nullbale struct fields on multiple level")
+@("a decoded struct can have a nested nullbale struct fields on multiple level")
 @system unittest
 {
     @XmlRoot("baz")
@@ -232,7 +232,7 @@ import fantasio.lib.xml;
     }
 }
 
-@("a target struct can have a dynamic array field")
+@("a decoded struct can have a dynamic array field")
 @system unittest
 {
     @XmlRoot("bar")
@@ -253,7 +253,7 @@ import fantasio.lib.xml;
     foo.shouldEqual(Foo([Bar("42"), Bar("43")]));
 }
 
-@("a target struct can have a dynamic array in a nested field")
+@("a decoded struct can have a dynamic array in a nested field")
 @system unittest
 {
     @XmlRoot("baz")
@@ -288,7 +288,7 @@ import fantasio.lib.xml;
     foo.shouldEqual(Foo(Bar([Baz("42"), Baz("43")])));
 }
 
-@("a target struct can have a dynamic array in a nullable nested field")
+@("a decoded struct can have a dynamic array in a nullable nested field")
 @system unittest
 {
     @XmlRoot("baz")
@@ -324,7 +324,7 @@ import fantasio.lib.xml;
     foo.bar.get.bazs.shouldEqual([Baz("42"), Baz("43")]);
 }
 
-@("a target struct can have nested dynamic arrays")
+@("a decoded struct can have nested dynamic arrays")
 @system unittest
 {
     @XmlRoot("baz")
@@ -364,23 +364,152 @@ import fantasio.lib.xml;
     foo.shouldEqual(Foo([Bar([Baz("42"), Baz("43")]), Bar([Baz("44"), Baz("45")])]));
 }
 
-// @("a target struct can have a lazy range field")
-// @system unittest
-// {
-//     @XmlRoot("bar")
-//     static struct Bar
-//     {
-//         @XmlAttr("id")
-//         string id;
-//     }
+@("a decoded struct can have a lazy range field")
+@system unittest
+{
+    @XmlRoot("bar")
+    static struct Bar
+    {
+        @XmlAttr("id")
+        string id;
+    }
 
-//     @XmlRoot("foo")
-//     static struct Foo
-//     {
-//         @XmlElementList("bar")
-//         DecodedXml!(Bar, string) bars;
-//     }
+    @XmlRoot("foo")
+    static struct Foo
+    {
+        @XmlElementList("bar")
+        LazyList!(Bar, string) bars;
+    }
 
-//     Foo foo = "<foo><bar id=\"42\"/><bar id=\"43\"/></foo>".decodeXmlAs!Foo.front;
-//     foo.bars.shouldEqual([Bar("42"), Bar("43")]);
-// }
+    Foo foo = "<foo><bar id=\"42\"/><bar id=\"43\"/></foo>".decodeXmlAs!Foo.front;
+    foo.bars.shouldEqual([Bar("42"), Bar("43")]);
+}
+
+@("a decoded struct can have nested lazy ranges")
+@system unittest
+{
+    @XmlRoot("baz")
+    static struct Baz
+    {
+        @XmlAttr("id")
+        uint id;
+    }
+
+    @XmlRoot("bar")
+    static struct Bar
+    {
+        @XmlElementList("baz")
+        LazyList!(Baz, string) bazs;
+    }
+
+    @XmlRoot("foo")
+    static struct Foo
+    {
+        @XmlElementList("bar")
+        LazyList!(Bar, string) bars;
+    }
+
+    Foo foo = q{
+        <foo>
+            <bar>
+                <baz id="42"/>
+                <baz id="43"/>
+            </bar>
+            <bar>
+                <baz id="44"/>
+                <baz id="45"/>
+            </bar>
+        </foo>
+    }.decodeXmlAs!Foo.front;
+
+    foo.bars.front.bazs.shouldEqual([Baz(42u), Baz(43u)]);
+    foo.bars.popFront();
+    foo.bars.front.bazs.shouldEqual([Baz(44u), Baz(45u)]);
+}
+
+@("a decoded struct can have many lazy range fields")
+@system unittest
+{
+    @XmlRoot("baz")
+    static struct Baz
+    {
+        @XmlAttr("id")
+        uint id;
+    }
+
+    @XmlRoot("bar")
+    static struct Bar
+    {
+        @XmlAttr("id")
+        uint id;
+    }
+
+    @XmlRoot("foo")
+    static struct Foo
+    {
+        @XmlElementList("bar")
+        LazyList!(Bar, string) bars;
+
+        @XmlElementList("baz")
+        LazyList!(Baz, string) bazs;
+    }
+
+    Foo foo = q{
+        <foo>
+            <bar id="42"/>
+            <bar id="43"/>
+            <baz id="44"/>
+            <baz id="45"/>
+        </foo>
+    }.decodeXmlAs!Foo.front;
+
+    foo.bars.shouldEqual([Bar(42u), Bar(43u)]);
+    foo.bazs.shouldEqual([Baz(44u), Baz(45u)]);
+}
+
+@("a range of decoded struct can have a nested lazy range field")
+@system unittest
+{
+    import std.range : walkLength;
+
+    @XmlRoot("bar")
+    static struct Bar
+    {
+        @XmlAttr("id")
+        uint id;
+    }
+
+    @XmlRoot("foo")
+    static struct Foo
+    {
+        @XmlAttr("id")
+        uint id;
+
+        @XmlElementList("bar")
+        LazyList!(Bar, string) bars;
+    }
+
+    auto foos = q{
+        <root>
+            <foo id="1">
+                <bar id="42"/>
+                <bar id="43"/>
+                <bar id="44"/>
+                <bar id="45"/>
+            </foo>
+            <foo id="2">
+                <bar id="46"/>
+                <bar id="47"/>
+                <bar id="48"/>
+                <bar id="49"/>
+            </foo>
+        </root>
+    }.decodeXmlAs!Foo;
+
+    foos.front.id.shouldEqual(1u);
+    foos.front.bars.shouldEqual([Bar(42u), Bar(43u), Bar(44u), Bar(45u)]);
+    foos.popFront();
+    foos.front.id.shouldEqual(2u);
+    foos.front.bars.shouldEqual([Bar(46u), Bar(47u), Bar(48u), Bar(49u)]);
+}
+

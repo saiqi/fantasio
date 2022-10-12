@@ -8,13 +8,13 @@ import dxml.parser : simpleXML, parseXML, EntityRange;
 private:
 enum bool isDecodable(T) = isForwardRange!T && isSomeChar!(ElementType!T);
 
-enum bool isDecodedRange(R) = is(R : DecodedXml!(S, T), S, T);
+enum bool isLazyList(R) = is(R : LazyList!(S, T), S, T);
 
 template rootName(T) if(hasUDA!(T, XmlRoot))
 {
     import std.traits : isArray, getUDAs;
     import std.range : ElementType;
-    static if(isArray!T || isDecodedRange!T)
+    static if(isArray!T || isLazyList!T)
         enum rootName = getUDAs!(ElementType!T, XmlRoot)[0].tagName;
     else
         enum rootName = getUDAs!(T, XmlRoot)[0].tagName;
@@ -39,7 +39,7 @@ template checkElementType(T, string name)
     import std.traits : isArray;
 
     alias member = __traits(getMember, T, name);
-    enum bool isList = isArray!(typeof(member)) || isDecodedRange!(typeof(member));
+    enum bool isList = isArray!(typeof(member)) || isLazyList!(typeof(member));
 
     static if(hasUDA!(member, XmlElement))
         enum bool checkElementType = !isList;
@@ -49,16 +49,21 @@ template checkElementType(T, string name)
         static assert(false);
 }
 
-auto cleanNs(R)(R tagName) if(isDecodable!R)
+string cleanNs(R)(R tagName) if(isDecodable!R)
 {
     import std.algorithm : splitter, fold;
-    import std.range : hasSlicing;
+    import std.traits : isArray;
     import std.array : array;
+    import std.conv : to;
 
-    static if(hasSlicing!R)
+    static if(isArray!R)
         return tagName.splitter(":").fold!((a, b) => b);
     else
-        return tagName.array.splitter(":").fold!((a, b) => b);
+        return tagName
+            .array
+            .splitter(":")
+            .fold!((a, b) => b)
+            .to!string;
 }
 
 template allChildren(T)
@@ -69,6 +74,29 @@ template allChildren(T)
         || hasUDA!(__traits(getMember, T, name), XmlElementList);
     enum allChildren = Filter!(isChild, __traits(allMembers, T));
 }
+
+enum bool hasNestedLazyList(T) =
+{
+    import std.traits : isArray;
+    import fantasio.lib.types : isNullable, NullableOf;
+
+    bool result = false;
+    static foreach(m; allChildren!T)
+    {{
+        static if(isNullable!(typeof(__traits(getMember, T, m))))
+            alias CT = NullableOf!(typeof(__traits(getMember, T, m)));
+        else
+            alias CT = typeof(__traits(getMember, T, m));
+        static if(!isArray!CT)
+        {
+            static if(isLazyList!CT)
+                result = true;
+            else
+                result = hasNestedLazyList!CT;
+        }
+    }}
+    return result;
+}();
 
 public:
 struct XmlRoot
@@ -103,6 +131,8 @@ class XMLDecodingException : Exception
     }
 }
 
+alias LazyList = DecodedXml;
+
 struct DecodedXml(S, T) if(isDecodable!T && hasUDA!(S, XmlRoot))
 {
     import dxml.parser : EntityType;
@@ -113,6 +143,8 @@ private:
 
     Entities _entities;
     S _current;
+    bool[ulong] _visitedPaths;
+    bool _endOfFragment;
 
     this(Entities entities)
     {
@@ -124,19 +156,19 @@ private:
     {
         while(!isNextEntityReached)
             this._entities.popFront();
-
         buildCurrent();
     }
 
     bool isNextEntityReached()
     {
-        return this._entities.empty
-        || (this._entities.front.type == EntityType.elementStart && this._entities.front.name.cleanNs == rootName!S);
+        auto entity = this._entities.front;
+        return this.empty
+            || (entity.type == EntityType.elementStart && entity.name.cleanNs == rootName!S);
     }
 
     void setLeafValue(ST)(ref ST source)
     {
-        import std.algorithm : find, equal;
+        import std.algorithm : find;
         import std.traits : getUDAs;
         import std.conv : to;
         import std.exception : enforce;
@@ -151,7 +183,7 @@ private:
             static if(hasUDA!(Member, XmlAttr))
             {
                 auto attrs = this._entities.front.attributes
-                    .find!(a => a.name.cleanNs.equal(getUDAs!(Member, XmlAttr)[0].name));
+                    .find!(a => a.name.cleanNs == getUDAs!(Member, XmlAttr)[0].name);
 
                 static if(isNullable!MemberT)
                 {
@@ -187,7 +219,7 @@ private:
         }}
     }
 
-    void setValue(ST, Path)(ref ST source, Path path)
+    void setValue(ST)(ref ST source, string[] path)
     {
         import std.traits : isArray;
         import fantasio.lib.types : isNullable, NullableOf, unpack;
@@ -196,17 +228,19 @@ private:
 
         bool isLeaf = path.length == 1;
 
-        // debug {
-        //     import std.stdio : writeln;
-        //     import std.string : join;
-        //     writeln(typeof(this).stringof ~ " " ~ ST.stringof ~ " " ~ path.join("/"));
-        // }
-
         if(!isLeaf) path = path[1 .. $];
 
-        static if(isDecodedRange!ST)
+        static if(isLazyList!ST)
         {
-            // if(isLeaf) source = ST(this._entities.save);
+            if(isLeaf)
+            {
+                auto hash = typeid(path[0]).getHash(&path[0]);
+                if(hash !in this._visitedPaths)
+                {
+                    source = ST(this._entities.save);
+                    this._visitedPaths[hash] = true;
+                }
+            }
         }
         else  static if(isArray!ST)
         {
@@ -273,8 +307,7 @@ private:
 
         assert(isNextEntityReached(), "Seek entities to the right location!");
 
-        alias PathT = typeof(this._entities.front.name.cleanNs);
-        Appender!(PathT[]) path;
+        Appender!(string[]) path;
         path.reserve(42);
 
         _current = S();
@@ -292,18 +325,25 @@ private:
             if(entity.type == EntityType.elementEnd)
             {
                 path.shrinkTo(path.data.length - 1u);
-                if(entity.name.cleanNs == rootName!S) break;
+
+                if(entity.name.cleanNs == rootName!S)
+                {
+                    break;
+                }
             }
 
             this._entities.popFront();
         }
+
+        static if(hasNestedLazyList!S)
+            this._visitedPaths.clear();
     }
 
 public:
 
     bool empty() inout
     {
-        return this._entities.empty;
+        return this._entities.empty || this._endOfFragment;
     }
 
     ref S front()
@@ -317,8 +357,16 @@ public:
         assert(!empty, "Pop the front from an empty range");
 
         do
+        {
             this._entities.popFront();
-        while(!isNextEntityReached());
+
+            if(!this._entities.empty)
+            {
+                auto entity = this._entities.front;
+                this._endOfFragment = entity.type == EntityType.elementEnd
+                    && rootName!S != entity.name.cleanNs;
+            }
+        } while(!isNextEntityReached());
         buildCurrent();
     }
 

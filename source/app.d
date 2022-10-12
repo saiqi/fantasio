@@ -3,23 +3,39 @@ import std.stdio : writeln;
 import fantasio.lib.xml;
 
 @XmlRoot("bar")
-struct Bar
+static struct Bar
 {
-	@XmlAttr("id")
-	string id;
+    @XmlAttr("id")
+    uint id;
 }
 
 @XmlRoot("foo")
-struct Foo
+static struct Foo
 {
-	@XmlElementList("bar")
-	DecodedXml!(Bar, string) bars;
-	// Bar[] bars;
+    @XmlAttr("id")
+    uint id;
+
+    @XmlElementList("bar")
+    LazyList!(Bar, string) bars;
 }
 
 void main()
 {
-	immutable xmlText = "<foo><bar id=\"0\"/><bar id=\"1\"/></foo>";
-	Foo foo = xmlText.decodeXmlAs!Foo.front;
-	writeln(foo.bars);
+    auto foos = q{
+        <root>
+            <foo id="1">
+                <bar id="42"/>
+                <bar id="43"/>
+                <bar id="44"/>
+                <bar id="45"/>
+            </foo>
+            <foo id="2">
+                <bar id="46"/>
+                <bar id="47"/>
+                <bar id="48"/>
+                <bar id="49"/>
+            </foo>
+        </root>
+    }.decodeXmlAs!Foo;
+    writeln(foos);
 }

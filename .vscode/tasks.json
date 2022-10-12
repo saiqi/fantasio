@@ -19,16 +19,19 @@
             "type": "dub",
             "run": false,
             "cwd": "${workspaceFolder}",
-            "compiler": "$current",
+            "compiler": "dmd",
             "archType": "$current",
             "buildType": "$current",
             "configuration": "$current",
             "problemMatcher": [
                 "$dmd"
             ],
-            "group": "build",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
             "label": "dub: Build fantasio",
-            "detail": "dub build --compiler=dmd -a=x86_64 -b=debug -c=executable"
+            "detail": "dub build --compiler=dmd -a=x86_64 -b=debugInfo -c=executable"
         }
     ]
 }

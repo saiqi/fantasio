@@ -10,7 +10,8 @@
             "request": "launch",
             "target": "./bin/fantasio",
             "cwd": "${workspaceRoot}",
-            "valuesFormatting": "prettyPrinters"
+            "valuesFormatting": "prettyPrinters",
+            "preLaunchTask": "dub: Build fantasio"
         }
     ]
 }

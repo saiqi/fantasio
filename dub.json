@@ -16,10 +16,6 @@
             "name": "executable"
         },
         {
-            "name": "executable-debug",
-            "dflags": ["-gc"]
-        },
-        {
             "name": "unittest",
             "targetType": "executable",
             "targetName": "ut",
