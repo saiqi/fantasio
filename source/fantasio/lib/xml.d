@@ -236,7 +236,6 @@ private:
         }}
     }
 
-    // void setValue(ST)(ref ST source, string[] path)
     void setValue(ST)(ref ST source, string[] path)
     {
         import std.traits : isArray;
@@ -322,7 +321,6 @@ private:
     void buildCurrent()
     {
         import std.array : Appender;
-        import std.array : array;
 
         assert(isNextEntityReached(), "Seek entities to the right location!");
 
