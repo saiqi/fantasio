@@ -82,8 +82,8 @@ import fantasio.lib.xml;
         double value;
     }
 
-    "<foo id=\"42\"/>".decodeXmlAs!Foo.shouldThrow;
-    "<foo>52.6</foo>".decodeXmlAs!Foo.shouldThrow;
+    "<foo id=\"42\"/>".decodeXmlAs!Foo.front.shouldThrow;
+    "<foo>52.6</foo>".decodeXmlAs!Foo.front.shouldThrow;
 }
 
 @("a decoded struct can have a nullable-primitive field")
@@ -149,7 +149,7 @@ import fantasio.lib.xml;
     }
 
     static assert(!__traits(compiles, {
-        "<foo><bar id=\"42\"/></foo>".decodeXmlAs!BadFoo;
+        "<foo><bar id=\"42\"/></foo>".decodeXmlAs!BadFoo.front;
     }));
 }
 

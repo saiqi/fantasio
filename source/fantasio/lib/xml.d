@@ -160,18 +160,20 @@ private:
     S _current;
     bool[ulong] _visitedPaths;
     bool _endOfFragment;
+    bool _primed;
 
     this(Entities entities)
     {
         this._entities = entities;
-        prime();
     }
 
     void prime()
     {
+        if(this._primed) return;
         while(!isNextEntityReached)
             this._entities.popFront();
         buildCurrent();
+        this._primed = true;
     }
 
     bool isNextEntityReached()
@@ -234,6 +236,7 @@ private:
         }}
     }
 
+    // void setValue(ST)(ref ST source, string[] path)
     void setValue(ST)(ref ST source, string[] path)
     {
         import std.traits : isArray;
@@ -252,7 +255,7 @@ private:
                 auto hash = typeid(path[0]).getHash(&path[0]);
                 if(hash !in this._visitedPaths)
                 {
-                    source = ST(this._entities.save);
+                    source = ST(this._entities);
                     this._visitedPaths[hash] = true;
                 }
             }
@@ -319,12 +322,11 @@ private:
     void buildCurrent()
     {
         import std.array : Appender;
+        import std.array : array;
 
         assert(isNextEntityReached(), "Seek entities to the right location!");
 
         Appender!(string[]) path;
-        path.reserve(42);
-
         _current = S();
 
         while(!empty)
@@ -342,9 +344,7 @@ private:
                 path.shrinkTo(path.data.length - 1u);
 
                 if(entity.name.cleanNs == rootName!S)
-                {
                     break;
-                }
             }
 
             this._entities.popFront();
@@ -365,6 +365,7 @@ public:
     /// ditto
     ref S front()
     {
+        prime();
         assert(!empty, "Fetch the front from an empty range");
         return this._current;
     }
@@ -372,6 +373,7 @@ public:
     /// ditto
     void popFront()
     {
+        prime();
         assert(!empty, "Pop the front from an empty range");
 
         do
