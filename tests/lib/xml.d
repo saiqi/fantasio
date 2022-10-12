@@ -4,7 +4,7 @@ import std.typecons : Nullable;
 import unit_threaded;
 import fantasio.lib.xml;
 
-@("a decoded XML range can be constructed from a range of characters")
+@("a decoded XML range can be constructed from a range of characters and be namespace agnostic")
 @system unittest
 {
     @XmlRoot("root")
@@ -14,7 +14,7 @@ import fantasio.lib.xml;
     }
 
     {
-        auto r = "<root id=\"0000\"></root>".decodeXmlAs!Root;
+        auto r = "<ns:root id=\"0000\"></ns:root>".decodeXmlAs!Root;
         r.shouldNotBeEmpty;
         r.front.shouldEqual(Root("0000"));
         auto c = r.save;
@@ -26,8 +26,9 @@ import fantasio.lib.xml;
     {
         import std.algorithm : joiner;
 
-        auto r = ["<root id=\"0000\"", "></root>"].joiner.decodeXmlAs!Root;
+        auto r = ["<ns:root id=\"0000\"", "></ns:root>"].joiner.decodeXmlAs!Root;
         r.shouldNotBeEmpty;
+        r.front.shouldEqual(Root("0000"));
         r.popFront();
         r.shouldBeEmpty;
     }
