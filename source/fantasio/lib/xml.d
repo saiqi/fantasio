@@ -98,6 +98,31 @@ enum bool hasNestedLazyList(T) =
     return result;
 }();
 
+class MemoryManager
+{
+    import std.array : Appender, appender;
+    import std.range;
+
+    Appender!(Appender!(string[])[]) appenders;
+
+    Appender!(string[]) getAppender()
+    {
+        if(this.appenders.data.empty) return appender!(string[]);
+
+        auto appender = this.appenders.data.back;
+
+        this.appenders.shrinkTo(this.appenders.data.length - 1u);
+
+        return appender;
+    }
+
+    void releaseAppender(Appender!(string[]) appender)
+    {
+        appender.clear;
+        this.appenders.put(appender);
+    }
+}
+
 public:
 
 /// UDA to define root node tag's name
@@ -161,10 +186,12 @@ private:
     bool[ulong] _visitedPaths;
     bool _endOfFragment;
     bool _primed;
+    MemoryManager _memoryManager;
 
-    this(Entities entities)
+    this(Entities entities, MemoryManager memoryManager)
     {
         this._entities = entities;
+        this._memoryManager = memoryManager;
     }
 
     void prime()
@@ -254,7 +281,7 @@ private:
                 auto hash = typeid(path[0]).getHash(&path[0]);
                 if(hash !in this._visitedPaths)
                 {
-                    source = ST(this._entities);
+                    source = ST(this._entities, this._memoryManager);
                     this._visitedPaths[hash] = true;
                 }
             }
@@ -324,7 +351,11 @@ private:
 
         assert(isNextEntityReached(), "Seek entities to the right location!");
 
-        Appender!(string[]) path;
+        auto path = this._memoryManager.getAppender();
+
+        scope(exit)
+            this._memoryManager.releaseAppender(path);
+
         _current = S();
 
         while(!empty)
@@ -405,8 +436,9 @@ template decodeXmlAs(alias S)
         ///ditto
         DecodedXml!(S!T, T) decodeXmlAs(T)(T xmlText) if(isDecodable!T)
         {
+            auto mm = new MemoryManager;
             auto entities = parseXML!(simpleXML, T)(xmlText);
-            return DecodedXml!(S!T, T)(entities);
+            return DecodedXml!(S!T, T)(entities, mm);
         }
     }
     else
@@ -414,8 +446,9 @@ template decodeXmlAs(alias S)
         /// ditto
         DecodedXml!(S, T) decodeXmlAs(T)(T xmlText) if(isDecodable!T)
         {
+            auto mm = new MemoryManager;
             auto entities = parseXML!(simpleXML, T)(xmlText);
-            return DecodedXml!(S, T)(entities);
+            return DecodedXml!(S, T)(entities, mm);
         }
 
     }

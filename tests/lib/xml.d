@@ -78,7 +78,7 @@ import fantasio.lib.xml;
         @XmlAttr("id")
         uint id;
 
-        @XmlText
+        @XmlAttr("value")
         double value;
     }
 
