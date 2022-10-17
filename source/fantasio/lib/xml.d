@@ -366,8 +366,6 @@ private:
 
     void buildCurrent()
     {
-        import std.array : Appender;
-
         assert(isNextEntityReached(), "Seek entities to the right location!");
 
         auto path = this._memoryManager.getAppender();
