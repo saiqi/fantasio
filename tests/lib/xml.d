@@ -512,7 +512,7 @@ import fantasio.lib.xml;
     foos.front.bars.shouldEqual([Bar(46u), Bar(47u), Bar(48u), Bar(49u)]);
 }
 
-@("A decoded struct having lazy ranges can be decoded from a range of characters")
+@("a decoded struct having lazy ranges can be decoded from a range of characters")
 @system unittest
 {
     import std.algorithm : joiner;
@@ -539,4 +539,36 @@ import fantasio.lib.xml;
         .decodeXmlAs!Foo;
     foos.front.id.shouldEqual(1u);
     foos.front.bars.shouldEqual([Bar(42u), Bar(43u)]);
+}
+
+@("all attributes of a node can be decoded in an associative array")
+@system unittest
+{
+    @XmlRoot("foo")
+    static struct Foo
+    {
+        @XmlAllAttrs
+        string[string] attrs;
+    }
+
+    auto foo = "<foo id=\"0001\" value=\"bar\"/>".decodeXmlAs!Foo.front;
+    foo.attrs["id"].shouldEqual("0001");
+    foo.attrs["value"].shouldEqual("bar");
+}
+
+@("all attributes of a node can be decoded in an associative array from a fragmented xml text")
+@system unittest
+{
+    import std.algorithm : joiner;
+
+    @XmlRoot("foo")
+    static struct Foo
+    {
+        @XmlAllAttrs
+        string[string] attrs;
+    }
+
+    auto foo = ["<foo id=\"0001\" va", "lue=\"bar\"/>"].joiner.decodeXmlAs!Foo.front;
+    foo.attrs["id"].shouldEqual("0001");
+    foo.attrs["value"].shouldEqual("bar");
 }

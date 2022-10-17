@@ -212,11 +212,13 @@ private:
 
     void setLeafValue(ST)(ref ST source)
     {
-        import std.algorithm : find;
-        import std.traits : getUDAs;
+        import std.algorithm : find, map;
+        import std.traits : getUDAs, isAssociativeArray, KeyType, ValueType;
+        import std.array : assocArray, array;
         import std.conv : to;
         import std.exception : enforce;
         import std.format : format;
+        import std.typecons : tuple;
         import fantasio.lib.types : NullableOf, isNullable;
 
         static foreach (m; __traits(allMembers, ST))
@@ -259,6 +261,21 @@ private:
                         format!"Not nullable field %s not provided"(m));
                     __traits(getMember, source, m) = copy.front.text.to!MemberT;
                 }
+            }
+            else static if(hasUDA!(Member, XmlAllAttrs))
+            {
+                static assert(isAssociativeArray!MemberT
+                    && isDecodable!(KeyType!MemberT)
+                    && isDecodable!(ValueType!MemberT), "all attributes can only be decoded in an AA");
+
+                static if(is(ValueType : string))
+                    __traits(getMember, source, m) = this._entities.front.attributes
+                        .map!(a => tuple(a.name.cleanNs, a.value))
+                        .assocArray;
+                else
+                    __traits(getMember, source, m) = this._entities.front.attributes
+                        .map!(a => tuple(a.name.cleanNs, a.value.array.to!string))
+                        .assocArray;
             }
         }}
     }
