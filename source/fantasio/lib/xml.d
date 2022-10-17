@@ -307,6 +307,8 @@ private:
         {
             alias ET = ElementType!ST;
 
+            static assert(!isNullable!ET, "arrays of nullable are not supported");
+
             if(isLeaf)
             {
                 auto item = ET();
@@ -387,10 +389,9 @@ private:
 
             if(entity.type == EntityType.elementEnd)
             {
-                path.shrinkTo(path.data.length - 1u);
-
-                if(entity.name.cleanNs == rootName!S)
+                if(path.data.length == 1)
                     break;
+                path.shrinkTo(path.data.length - 1u);
             }
 
             this._entities.popFront();

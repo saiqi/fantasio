@@ -572,3 +572,30 @@ import fantasio.lib.xml;
     foo.attrs["id"].shouldEqual("0001");
     foo.attrs["value"].shouldEqual("bar");
 }
+
+@("a hierarchical data structure can be decoded")
+@system unittest
+{
+    @XmlRoot("foo")
+    static struct Foo
+    {
+        @XmlAttr("id")
+        uint id;
+
+        @XmlElementList("foo")
+        Foo[] children;
+    }
+
+    auto foo = q{
+        <foo id="1">
+            <foo id="11"/>
+            <foo id="12">
+                <foo id="121"/>
+            </foo>
+        </foo>
+    }.decodeXmlAs!Foo.front;
+
+    foo.children[0].id.shouldEqual(11u);
+    foo.children[1].id.shouldEqual(12u);
+    foo.children[1].children[0].id.shouldEqual(121u);
+}
