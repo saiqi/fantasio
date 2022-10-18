@@ -183,7 +183,8 @@ private:
 
     Entities _entities;
     S _current;
-    bool[ulong] _visitedPaths;
+    static if(hasNestedLazyList!S)
+        bool[ulong] _visitedPaths;
     bool _endOfFragment;
     bool _primed;
     MemoryManager _memoryManager;
