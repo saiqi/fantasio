@@ -15,22 +15,22 @@ import fantasio.lib.xml;
 
     {
         auto r = "<ns:root id=\"0000\"></ns:root>".decodeXmlAs!Root;
-        r.shouldNotBeEmpty;
+        r.empty.shouldBeFalse;
         r.front.shouldEqual(Root("0000"));
         auto c = r.save;
         r.popFront();
-        r.shouldBeEmpty;
-        c.shouldNotBeEmpty;
+        r.empty.shouldBeTrue;
+        c.empty.shouldBeFalse;
     }
 
     {
         import std.algorithm : joiner;
 
         auto r = ["<ns:root id=\"0000\"", "></ns:root>"].joiner.decodeXmlAs!Root;
-        r.shouldNotBeEmpty;
+        r.empty.shouldBeFalse;
         r.front.shouldEqual(Root("0000"));
         r.popFront();
-        r.shouldBeEmpty;
+        r.empty.shouldBeTrue;
     }
 }
 
@@ -598,4 +598,18 @@ import fantasio.lib.xml;
     foo.children[0].id.shouldEqual(11u);
     foo.children[1].id.shouldEqual(12u);
     foo.children[1].children[0].id.shouldEqual(121u);
+}
+
+@("decoding to an inappropriate struct must result in an empty range")
+@system unittest
+{
+    @XmlRoot("foo")
+    static struct Foo
+    {
+        @XmlAttr("id")
+        uint id;
+    }
+
+    auto foos = "<bar><baz/></bar>".decodeXmlAs!Foo;
+    foos.empty.shouldBeTrue;
 }

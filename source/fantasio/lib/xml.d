@@ -200,14 +200,16 @@ private:
         if(this._primed) return;
         while(!isNextEntityReached)
             this._entities.popFront();
-        buildCurrent();
         this._primed = true;
+        if(!this._entities.empty)
+            buildCurrent();
     }
 
     bool isNextEntityReached()
     {
+        if(this._entities.empty) return true;
         auto entity = this._entities.front;
-        return this.empty
+        return this._endOfFragment
             || (entity.type == EntityType.elementStart && entity.name.cleanNs == rootName!S);
     }
 
@@ -266,7 +268,7 @@ private:
             else static if(hasUDA!(Member, XmlAllAttrs))
             {
                 static assert(isAssociativeArray!MemberT
-                    && isDecodable!(KeyType!MemberT)
+                    && is(KeyType!MemberT : string)
                     && isDecodable!(ValueType!MemberT), "all attributes can only be decoded in an AA");
 
                 static if(is(ValueType : string))
@@ -403,8 +405,9 @@ private:
 public:
 
     /// ditto
-    bool empty() inout
+    bool empty()
     {
+        prime();
         return this._entities.empty || this._endOfFragment;
     }
 
@@ -448,7 +451,9 @@ public:
 /// Functions that build `DecodedXml` from a range of characters
 template decodeXmlAs(alias S)
 {
-    static if(is(S!(char[])))
+    enum bool isTemplated = is(S!(char[]));
+
+    static if(isTemplated)
     {
         ///ditto
         DecodedXml!(S!T, T) decodeXmlAs(T)(T xmlText) if(isDecodable!T)
@@ -467,6 +472,5 @@ template decodeXmlAs(alias S)
             auto entities = parseXML!(simpleXML, T)(xmlText);
             return DecodedXml!(S, T)(entities, mm);
         }
-
     }
 }
