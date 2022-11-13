@@ -3,7 +3,6 @@ module fantasio.lib.xml;
 import std.typecons : Nullable;
 import std.range : isForwardRange, ElementType;
 import std.traits : isSomeChar, hasUDA;
-import dxml.parser : simpleXML, parseXML, EntityRange;
 
 private:
 enum bool isDecodable(T) = isForwardRange!T && isSomeChar!(ElementType!T);
@@ -175,7 +174,7 @@ alias LazyList = DecodedXml;
  */
 struct DecodedXml(S, T) if(isDecodable!T && hasUDA!(S, XmlRoot))
 {
-    import dxml.parser : EntityType;
+    import dxml.parser : EntityType, EntityRange, simpleXML;
 
     alias Entities = EntityRange!(simpleXML, T);
 
@@ -451,6 +450,8 @@ public:
 /// Functions that build `DecodedXml` from a range of characters
 template decodeXmlAs(alias S)
 {
+    import dxml.parser : parseXML, simpleXML;
+
     enum bool isTemplated = is(S!(char[]));
 
     static if(isTemplated)
