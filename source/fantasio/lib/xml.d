@@ -314,7 +314,7 @@ private:
 
             if(isLeaf)
             {
-                auto item = ET();
+                auto item = ET.init;
                 setValue(item, path);
                 source ~= item;
             }
