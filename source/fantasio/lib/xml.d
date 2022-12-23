@@ -7,13 +7,11 @@ import std.traits : isSomeChar, hasUDA;
 private:
 enum bool isDecodable(T) = isForwardRange!T && isSomeChar!(ElementType!T);
 
-enum bool isLazyList(R) = is(R : LazyList!(S, T), S, T);
-
 template rootName(T) if(hasUDA!(T, XmlRoot))
 {
     import std.traits : isArray, getUDAs;
     import std.range : ElementType;
-    static if(isArray!T || isLazyList!T)
+    static if(isArray!T)
         enum rootName = getUDAs!(ElementType!T, XmlRoot)[0].tagName;
     else
         enum rootName = getUDAs!(T, XmlRoot)[0].tagName;
@@ -38,7 +36,7 @@ template checkElementType(T, string name)
     import std.traits : isArray;
 
     alias member = __traits(getMember, T, name);
-    enum bool isList = isArray!(typeof(member)) || isLazyList!(typeof(member));
+    enum bool isList = isArray!(typeof(member));
 
     static if(hasUDA!(member, XmlElement))
         enum bool checkElementType = !isList;
@@ -73,29 +71,6 @@ template allChildren(T)
         || hasUDA!(__traits(getMember, T, name), XmlElementList);
     enum allChildren = Filter!(isChild, __traits(allMembers, T));
 }
-
-enum bool hasNestedLazyList(T) =
-{
-    import std.traits : isArray;
-    import fantasio.lib.types : isNullable, NullableOf;
-
-    bool result = false;
-    static foreach(m; allChildren!T)
-    {{
-        static if(isNullable!(typeof(__traits(getMember, T, m))))
-            alias CT = NullableOf!(typeof(__traits(getMember, T, m)));
-        else
-            alias CT = typeof(__traits(getMember, T, m));
-        static if(!isArray!CT)
-        {
-            static if(isLazyList!CT)
-                result = true;
-            else
-                result = hasNestedLazyList!CT;
-        }
-    }}
-    return result;
-}();
 
 class MemoryManager
 {
@@ -163,9 +138,6 @@ class XMLDecodingException : Exception
     }
 }
 
-/// Alias of `DecodedXml` to improve semantic when users define a field as a lazy range
-alias LazyList = DecodedXml;
-
 /**
  * A forward range that iterates over a `dxml.parser.EntityRange`
  * to build element of given type `S`.
@@ -182,8 +154,6 @@ private:
 
     Entities _entities;
     S _current;
-    static if(hasNestedLazyList!S)
-        bool[ulong] _visitedPaths;
     bool _endOfFragment;
     bool _primed;
     MemoryManager _memoryManager;
@@ -293,19 +263,7 @@ private:
 
         if(!isLeaf) path = path[1 .. $];
 
-        static if(isLazyList!ST)
-        {
-            if(isLeaf)
-            {
-                auto hash = typeid(path[0]).getHash(&path[0]);
-                if(hash !in this._visitedPaths)
-                {
-                    source = ST(this._entities, this._memoryManager);
-                    this._visitedPaths[hash] = true;
-                }
-            }
-        }
-        else  static if(isArray!ST)
+        static if(isArray!ST)
         {
             alias ET = ElementType!ST;
 
@@ -396,9 +354,6 @@ private:
 
             this._entities.popFront();
         }
-
-        static if(hasNestedLazyList!S)
-            this._visitedPaths.clear();
     }
 
 public:
