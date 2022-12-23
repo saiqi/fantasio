@@ -172,7 +172,7 @@ alias LazyList = DecodedXml;
  * Constructor is private, use `decodeXmlAs` instead
  * Throws: XMLDecodingException when a non optional field (not defined as `Nullable`) is missing
  */
-struct DecodedXml(S, T) if(isDecodable!T && hasUDA!(S, XmlRoot))
+struct DecodedXml(S, T = string) if(isDecodable!T && hasUDA!(S, XmlRoot))
 {
     import dxml.parser : EntityType, EntityRange, simpleXML;
 
@@ -448,30 +448,21 @@ public:
 }
 
 /// Functions that build `DecodedXml` from a range of characters
-template decodeXmlAs(alias S)
+
+DecodedXml!(S, T) decodeXmlAsRangeOf(S, T)(T xmlText) if(isDecodable!T)
 {
     import dxml.parser : parseXML, simpleXML;
 
-    enum bool isTemplated = is(S!(char[]));
+    auto mm = new MemoryManager;
+    auto entities = parseXML!(simpleXML, T)(xmlText);
+    return DecodedXml!(S, T)(entities, mm);
+}
 
-    static if(isTemplated)
-    {
-        ///ditto
-        DecodedXml!(S!T, T) decodeXmlAs(T)(T xmlText) if(isDecodable!T)
-        {
-            auto mm = new MemoryManager;
-            auto entities = parseXML!(simpleXML, T)(xmlText);
-            return DecodedXml!(S!T, T)(entities, mm);
-        }
-    }
-    else
-    {
-        /// ditto
-        DecodedXml!(S, T) decodeXmlAs(T)(T xmlText) if(isDecodable!T)
-        {
-            auto mm = new MemoryManager;
-            auto entities = parseXML!(simpleXML, T)(xmlText);
-            return DecodedXml!(S, T)(entities, mm);
-        }
-    }
+S decodeXmlAs(S, T)(T xmlText) if(isDecodable!T)
+{
+    import std.exception : enforce;
+
+    auto r = decodeXmlAsRangeOf!(S, T)(xmlText);
+    enforce!XMLDecodingException(!r.empty, "Could not decode XML as " ~ S.stringof);
+    return r.front;
 }

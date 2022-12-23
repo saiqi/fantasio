@@ -14,7 +14,7 @@ import fantasio.lib.xml;
     }
 
     {
-        auto r = "<ns:root id=\"0000\"></ns:root>".decodeXmlAs!Root;
+        auto r = "<ns:root id=\"0000\"></ns:root>".decodeXmlAsRangeOf!Root;
         r.empty.shouldBeFalse;
         r.front.shouldEqual(Root("0000"));
         auto c = r.save;
@@ -26,7 +26,7 @@ import fantasio.lib.xml;
     {
         import std.algorithm : joiner;
 
-        auto r = ["<ns:root id=\"0000\"", "></ns:root>"].joiner.decodeXmlAs!Root;
+        auto r = ["<ns:root id=\"0000\"", "></ns:root>"].joiner.decodeXmlAsRangeOf!Root;
         r.empty.shouldBeFalse;
         r.front.shouldEqual(Root("0000"));
         r.popFront();
@@ -45,7 +45,7 @@ import fantasio.lib.xml;
     }
 
     auto r = "<root><foo id=\"1\"/><foo id=\"2\"/></root>"
-        .decodeXmlAs!Foo;
+        .decodeXmlAsRangeOf!Foo;
     r.shouldNotBeEmpty;
     r.shouldEqual([Foo(1u), Foo(2u)]);
 }
@@ -63,7 +63,7 @@ import fantasio.lib.xml;
         double value;
     }
 
-    auto r = "<foo id=\"42\">52.6</foo>".decodeXmlAs!Foo;
+    auto r = "<foo id=\"42\">52.6</foo>".decodeXmlAsRangeOf!Foo;
     r.shouldNotBeEmpty;
     r.front.id.shouldEqual(42u);
     r.front.value.shouldEqual(52.6);
@@ -82,8 +82,8 @@ import fantasio.lib.xml;
         double value;
     }
 
-    "<foo id=\"42\"/>".decodeXmlAs!Foo.front.shouldThrow;
-    "<foo>52.6</foo>".decodeXmlAs!Foo.front.shouldThrow;
+    "<foo id=\"42\"/>".decodeXmlAsRangeOf!Foo.front.shouldThrow;
+    "<foo>52.6</foo>".decodeXmlAsRangeOf!Foo.front.shouldThrow;
 }
 
 @("a decoded struct can have a nullable-primitive field")
@@ -99,12 +99,12 @@ import fantasio.lib.xml;
         Nullable!double value;
     }
 
-    Foo foo = "<foo id=\"42\"/>".decodeXmlAs!Foo.front;
+    Foo foo = "<foo id=\"42\"/>".decodeXmlAsRangeOf!Foo.front;
     foo.value.isNull.shouldBeTrue;
     foo.id.isNull.shouldBeFalse;
     foo.id.get.shouldEqual(42u);
 
-    Foo other = "<foo>52.6</foo>".decodeXmlAs!Foo.front;
+    Foo other = "<foo>52.6</foo>".decodeXmlAsRangeOf!Foo.front;
     other.value.isNull.shouldBeFalse;
     other.value.get.shouldEqual(52.6);
     other.id.isNull.shouldBeTrue;
@@ -127,7 +127,7 @@ import fantasio.lib.xml;
         Bar bar;
     }
 
-    Foo foo = "<foo><bar id=\"42\"/></foo>".decodeXmlAs!Foo.front;
+    Foo foo = "<foo><bar id=\"42\"/></foo>".decodeXmlAsRangeOf!Foo.front;
     foo.shouldEqual(Foo(Bar("42")));
 }
 
@@ -149,7 +149,7 @@ import fantasio.lib.xml;
     }
 
     static assert(!__traits(compiles, {
-        "<foo><bar id=\"42\"/></foo>".decodeXmlAs!BadFoo.front;
+        "<foo><bar id=\"42\"/></foo>".decodeXmlAsRangeOf!BadFoo.front;
     }));
 }
 
@@ -171,13 +171,13 @@ import fantasio.lib.xml;
     }
 
     {
-        Foo foo = "<foo><bar id=\"42\"/></foo>".decodeXmlAs!Foo.front;
+        Foo foo = "<foo><bar id=\"42\"/></foo>".decodeXmlAsRangeOf!Foo.front;
         foo.bar.isNull.shouldBeFalse;
         foo.bar.get.id.shouldEqual("42");
     }
 
     {
-        Foo foo = "<foo></foo>".decodeXmlAs!Foo.front;
+        Foo foo = "<foo></foo>".decodeXmlAsRangeOf!Foo.front;
         foo.bar.isNull.shouldBeTrue;
     }
 }
@@ -207,7 +207,7 @@ import fantasio.lib.xml;
     }
 
     {
-        Foo foo = "<foo><bar><baz id=\"42\"/></bar></foo>".decodeXmlAs!Foo.front;
+        Foo foo = "<foo><bar><baz id=\"42\"/></bar></foo>".decodeXmlAsRangeOf!Foo.front;
         foo.bar.isNull.shouldBeFalse;
         foo.bar.get.baz.isNull.shouldBeFalse;
         foo.bar.get.baz.get.id.isNull.shouldBeFalse;
@@ -215,20 +215,20 @@ import fantasio.lib.xml;
     }
 
     {
-        Foo foo = "<foo><bar><baz/></bar></foo>".decodeXmlAs!Foo.front;
+        Foo foo = "<foo><bar><baz/></bar></foo>".decodeXmlAsRangeOf!Foo.front;
         foo.bar.isNull.shouldBeFalse;
         foo.bar.get.baz.isNull.shouldBeFalse;
         foo.bar.get.baz.get.id.isNull.shouldBeTrue;
     }
 
     {
-        Foo foo = "<foo><bar></bar></foo>".decodeXmlAs!Foo.front;
+        Foo foo = "<foo><bar></bar></foo>".decodeXmlAsRangeOf!Foo.front;
         foo.bar.isNull.shouldBeFalse;
         foo.bar.get.baz.isNull.shouldBeTrue;
     }
 
     {
-        Foo foo = "<foo></foo>".decodeXmlAs!Foo.front;
+        Foo foo = "<foo></foo>".decodeXmlAsRangeOf!Foo.front;
         foo.bar.isNull.shouldBeTrue;
     }
 }
@@ -250,7 +250,7 @@ import fantasio.lib.xml;
         Bar[] bars;
     }
 
-    Foo foo = "<foo><bar id=\"42\"/><bar id=\"43\"/></foo>".decodeXmlAs!Foo.front;
+    Foo foo = "<foo><bar id=\"42\"/><bar id=\"43\"/></foo>".decodeXmlAsRangeOf!Foo.front;
     foo.shouldEqual(Foo([Bar("42"), Bar("43")]));
 }
 
@@ -285,7 +285,7 @@ import fantasio.lib.xml;
                 <baz id="43"/>
             </bar>
         </foo>
-    }.decodeXmlAs!Foo.front;
+    }.decodeXmlAsRangeOf!Foo.front;
     foo.shouldEqual(Foo(Bar([Baz("42"), Baz("43")])));
 }
 
@@ -320,7 +320,7 @@ import fantasio.lib.xml;
                 <baz id="43"/>
             </bar>
         </foo>
-    }.decodeXmlAs!Foo.front;
+    }.decodeXmlAsRangeOf!Foo.front;
 
     foo.bar.get.bazs.shouldEqual([Baz("42"), Baz("43")]);
 }
@@ -360,7 +360,7 @@ import fantasio.lib.xml;
                 <baz id="45"/>
             </bar>
         </foo>
-    }.decodeXmlAs!Foo.front;
+    }.decodeXmlAsRangeOf!Foo.front;
 
     foo.shouldEqual(Foo([Bar([Baz("42"), Baz("43")]), Bar([Baz("44"), Baz("45")])]));
 }
@@ -382,7 +382,7 @@ import fantasio.lib.xml;
         LazyList!(Bar, string) bars;
     }
 
-    Foo foo = "<foo><bar id=\"42\"/><bar id=\"43\"/></foo>".decodeXmlAs!Foo.front;
+    Foo foo = "<foo><bar id=\"42\"/><bar id=\"43\"/></foo>".decodeXmlAsRangeOf!Foo.front;
     foo.bars.shouldEqual([Bar("42"), Bar("43")]);
 }
 
@@ -421,7 +421,7 @@ import fantasio.lib.xml;
                 <baz id="45"/>
             </bar>
         </foo>
-    }.decodeXmlAs!Foo.front;
+    }.decodeXmlAsRangeOf!Foo.front;
 
     foo.bars.front.bazs.shouldEqual([Baz(42u), Baz(43u)]);
     foo.bars.popFront();
@@ -462,7 +462,7 @@ import fantasio.lib.xml;
             <baz id="44"/>
             <baz id="45"/>
         </foo>
-    }.decodeXmlAs!Foo.front;
+    }.decodeXmlAsRangeOf!Foo.front;
 
     foo.bars.shouldEqual([Bar(42u), Bar(43u)]);
     foo.bazs.shouldEqual([Baz(44u), Baz(45u)]);
@@ -485,7 +485,7 @@ import fantasio.lib.xml;
         uint id;
 
         @XmlElementList("bar")
-        LazyList!(Bar, string) bars;
+        LazyList!Bar bars;
     }
 
     auto foos = q{
@@ -503,42 +503,13 @@ import fantasio.lib.xml;
                 <bar id="49"/>
             </foo>
         </root>
-    }.decodeXmlAs!Foo;
+    }.decodeXmlAsRangeOf!Foo;
 
     foos.front.id.shouldEqual(1u);
     foos.front.bars.shouldEqual([Bar(42u), Bar(43u), Bar(44u), Bar(45u)]);
     foos.popFront();
     foos.front.id.shouldEqual(2u);
     foos.front.bars.shouldEqual([Bar(46u), Bar(47u), Bar(48u), Bar(49u)]);
-}
-
-@("a decoded struct having lazy ranges can be decoded from a range of characters")
-@system unittest
-{
-    import std.algorithm : joiner;
-
-    @XmlRoot("bar")
-    static struct Bar
-    {
-        @XmlAttr("id")
-        uint id;
-    }
-
-    @XmlRoot("foo")
-    static struct Foo(R)
-    {
-        @XmlAttr("id")
-        uint id;
-
-        @XmlElementList("bar")
-        LazyList!(Bar, R) bars;
-    }
-
-    auto foos = ["<foo id=\"1\"><bar id=\"42\"", "/><bar id=\"43\"/></foo>"]
-        .joiner
-        .decodeXmlAs!Foo;
-    foos.front.id.shouldEqual(1u);
-    foos.front.bars.shouldEqual([Bar(42u), Bar(43u)]);
 }
 
 @("all attributes of a node can be decoded in an associative array")
@@ -551,7 +522,7 @@ import fantasio.lib.xml;
         string[string] attrs;
     }
 
-    auto foo = "<foo id=\"0001\" value=\"bar\"/>".decodeXmlAs!Foo.front;
+    auto foo = "<foo id=\"0001\" value=\"bar\"/>".decodeXmlAsRangeOf!Foo.front;
     foo.attrs["id"].shouldEqual("0001");
     foo.attrs["value"].shouldEqual("bar");
 }
@@ -568,7 +539,7 @@ import fantasio.lib.xml;
         string[string] attrs;
     }
 
-    auto foo = ["<foo id=\"0001\" va", "lue=\"bar\"/>"].joiner.decodeXmlAs!Foo.front;
+    auto foo = ["<foo id=\"0001\" va", "lue=\"bar\"/>"].joiner.decodeXmlAsRangeOf!Foo.front;
     foo.attrs["id"].shouldEqual("0001");
     foo.attrs["value"].shouldEqual("bar");
 }
@@ -593,7 +564,7 @@ import fantasio.lib.xml;
                 <foo id="121"/>
             </foo>
         </foo>
-    }.decodeXmlAs!Foo.front;
+    }.decodeXmlAsRangeOf!Foo.front;
 
     foo.children[0].id.shouldEqual(11u);
     foo.children[1].id.shouldEqual(12u);
@@ -610,6 +581,50 @@ import fantasio.lib.xml;
         uint id;
     }
 
-    auto foos = "<bar><baz/></bar>".decodeXmlAs!Foo;
+    auto foos = "<bar><baz/></bar>".decodeXmlAsRangeOf!Foo;
     foos.empty.shouldBeTrue;
+}
+
+@("an XML text can be decoded as a single struct")
+@system unittest
+{
+    @XmlRoot("baz")
+    static struct Baz
+    {
+        @XmlAttr("id")
+        string id;
+    }
+
+    @XmlRoot("bar")
+    static struct Bar
+    {
+        @XmlElementList("baz")
+        Baz[] bazs;
+    }
+
+    @XmlRoot("foo")
+    static struct Foo
+    {
+        @XmlElementList("bar")
+        Bar[] bar;
+    }
+
+    @XmlRoot("foobar")
+    static struct FooBar
+    {
+        @XmlAttr("id")
+        string id;
+    }
+
+    const xmlText = q{
+        <foo>
+            <bar>
+                <baz id="42"/>
+                <baz id="43"/>
+            </bar>
+        </foo>
+    };
+
+    xmlText.decodeXmlAs!Foo.shouldEqual(Foo([Bar([Baz("42"), Baz("43")])]));
+    xmlText.decodeXmlAs!FooBar.shouldThrow;
 }
