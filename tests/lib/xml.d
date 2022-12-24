@@ -342,15 +342,29 @@ import fantasio.lib.xml;
         Baz[] bazs;
     }
 
+    @XmlRoot("foobar")
+    static struct FooBar
+    {
+        @XmlElementList("baz")
+        Baz[] bazs;
+    }
+
     @XmlRoot("foo")
     static struct Foo
     {
+
+        @XmlElement("foobar")
+        FooBar foobar;
+
         @XmlElementList("bar")
         Bar[] bar;
     }
 
     Foo foo = q{
         <foo>
+            <foobar>
+                <baz id="12"/>
+            </foobar>
             <bar>
                 <baz id="42"/>
                 <baz id="43"/>
@@ -362,7 +376,7 @@ import fantasio.lib.xml;
         </foo>
     }.decodeXmlAsRangeOf!Foo.front;
 
-    foo.shouldEqual(Foo([Bar([Baz("42"), Baz("43")]), Bar([Baz("44"), Baz("45")])]));
+    foo.shouldEqual(Foo(FooBar([Baz("12")]), [Bar([Baz("42"), Baz("43")]), Bar([Baz("44"), Baz("45")])]));
 }
 
 @("all attributes of a node can be decoded in an associative array")
