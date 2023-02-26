@@ -298,7 +298,15 @@ private:
         else
         {
             if(isLeaf)
-                setLeafValue(source);
+            {
+                static if(isNullable!ST)
+                {
+                    if(!source.isNull)
+                        setLeafValue(source.get);
+                }
+                else
+                    setLeafValue(source);
+            }
             else
             {
                 static foreach (m; unpack!(ST, allChildren))
@@ -308,14 +316,27 @@ private:
                         static assert(unpack!(ST, checkElementType, m),
                             m ~ " is a range but is defined to be decoded as a single element");
 
-                        alias CT = typeof(__traits(getMember, ST, m));
+                        static if(isNullable!ST)
+                            alias CT = typeof(__traits(getMember, NullableOf!ST, m));
+                        else
+                            alias CT = typeof(__traits(getMember, ST, m));
 
                         static if(isNullable!CT)
                         {
-                            if(__traits(getMember, source, m).isNull)
-                                __traits(getMember, source, m) = NullableOf!CT();
-                            setValue(__traits(getMember, source, m).get, path);
+                            static if(isNullable!ST)
+                            {
+                                if(__traits(getMember, source.get, m).isNull)
+                                    __traits(getMember, source.get, m) = NullableOf!CT();
+                            }
+                            else
+                            {
+                                if(__traits(getMember, source, m).isNull)
+                                    __traits(getMember, source, m) = NullableOf!CT();
+                            }
                         }
+
+                        static if(isNullable!ST)
+                            setValue(__traits(getMember, source.get, m), path);
                         else
                             setValue(__traits(getMember, source, m), path);
                     }

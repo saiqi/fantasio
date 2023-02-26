@@ -495,3 +495,61 @@ import fantasio.lib.xml;
     xmlText.decodeXmlAs!Foo.shouldEqual(Foo([Bar([Baz("42"), Baz("43")])]));
     xmlText.decodeXmlAs!FooBar.shouldThrow;
 }
+
+@("a deeply nested nullable struct can be decoded")
+@system unittest
+{
+    import std.typecons : nullable;
+
+    @XmlRoot("quz")
+    static struct Quz
+    {
+        @XmlAttr("id")
+        string id;
+    }
+
+    @XmlRoot("Baz")
+    static struct Baz
+    {
+        @XmlElement("quz")
+        Nullable!Quz quz;
+    }
+
+    @XmlRoot("Bar")
+    static struct Bar
+    {
+        @XmlElementList("baz")
+        Baz[] baz;
+    }
+
+    @XmlRoot("foo")
+    static struct Foo
+    {
+        @XmlElement("bar")
+        Nullable!Bar bar;
+    }
+
+    const xmlText = q{
+        <foo>
+            <bar>
+                <baz>
+                    <quz id="hello">
+                    </quz>
+                </baz>
+            </bar>
+        </foo>
+    };
+
+    auto foo = xmlText.decodeXmlAs!Foo;
+    foo.shouldEqual(
+        Foo(
+            Bar(
+                [
+                    Baz(
+                        Quz("hello").nullable
+                    )
+                ]
+            ).nullable
+        )
+    );
+}
