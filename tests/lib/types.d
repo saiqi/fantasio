@@ -30,7 +30,7 @@ import fantasio.lib.types;
     success.get.shouldEqual(42);
 }
 
-@("a result can match on user defined error")
+@("a result can match an user defined error")
 @safe pure unittest
 {
     import std.sumtype : match;
@@ -81,7 +81,7 @@ unittest
         .shouldEqual([1]);
 }
 
-@("a result that is a success or a failure can be qualified")
+@("identify whether or not a result is a success or a failure")
 @safe pure unittest
 {
     Result!(int, Error) reciprocal(int v) pure nothrow @safe
@@ -96,7 +96,7 @@ unittest
     reciprocal(0).isFailure.shouldBeTrue;
 }
 
-@("a function when applying to a success result should return a success result")
+@("apply a function to a success result")
 @safe pure unittest
 {
     Result!(int, Error) success = 42;
@@ -105,7 +105,7 @@ unittest
     result.get.shouldEqual(43);
 }
 
-@("a function that returns a different type when applying to a success result should return a result of this type")
+@("apply a function that returns a different type from its arguments to a success result")
 @safe pure unittest
 {
     import std.conv : to;
@@ -115,7 +115,7 @@ unittest
     result.get.shouldEqual("42");
 }
 
-@("a function when applying to a failure result should return a failure result")
+@("apply a function when applying to a failure result")
 @safe pure unittest
 {
     Result!(int, Error) failure = new Error("");
@@ -123,7 +123,7 @@ unittest
     result.isFailure.shouldBeTrue;
 }
 
-@("apply calls can be chained")
+@("chain apply calls")
 @safe pure unittest
 {
     import std.math : floor;
@@ -197,27 +197,27 @@ unittest
         (double v) => "NoError").shouldEqual("ZeroDivisionError");
 }
 
-@("a success result should be converted to a non-null nullable")
+@("convert a success result to a non-null nullable")
 @safe pure unittest
 {
         Result!(int, Error) success = 42;
         success.toNullable.get.shouldEqual(42);
 }
 
-@("a failure result should be converted to a null nullable")
+@("convert a failure result to a null nullable")
 @safe pure unittest {
     Result!(int, Error) failure = new Error("");
     failure.toNullable.isNull.should == true;
 }
 
-@("a const success result can be converted to nullable")
+@("convert a const success result to nullable")
 @safe pure unittest
 {
     const success = Result!(int, Error)(42);
     success.toNullable.get.shouldEqual(42);
 }
 
-@("a const success result of nested struct can be converted to nullable")
+@("convert a const success result of nested struct to nullable")
 @safe pure unittest
 {
     struct S1
@@ -234,21 +234,21 @@ unittest
     success.toNullable.isNull.shouldBeFalse;
 }
 
-@("the value of a success result can be extracted")
+@("extract the value of a success result")
 @safe pure unittest
 {
     Result!(int, Error) success = 42;
     success.get.shouldEqual(42);
 }
 
-@("the value of a const success result can be extracted")
+@("extract the value of a const success result")
 @safe pure unittest
 {
     const success = Result!(int, Error)(42);
     success.get.shouldEqual(42);
 }
 
-@("the value of a const success result of nested struct can be extracted")
+@("extract the value of a const success result of nested struct")
 @safe pure unittest
 {
     struct S1
@@ -265,16 +265,44 @@ unittest
     success.get.values.shouldEqual([S1(0), S1(1)]);
 }
 
-@("a failure result when extracting its value providing a fallback should return the fallback")
+@("extract a failure result with a fallback value")
 @safe pure unittest
 {
     Result!(int, Error) failure = new Error("");
     failure.get(42).shouldEqual(42);
 }
 
-@("a success result when extracting its value providing a fallback should return the value of the result")
+@("extract a success result value")
 @safe pure unittest
 {
     Result!(int, Error) success = 42;
     success.get(43).shouldEqual(42);
+}
+
+@("extract a failure")
+@safe pure unittest
+{
+    class MyError : Error
+    {
+        pure nothrow @nogc @safe this(string msg, Throwable nextInChain = null)
+        {
+            super(msg, nextInChain);
+        }
+    }
+
+    Result!(int, MyError) failure = new MyError("");
+    failure.getError;
+}
+
+@("transform a range of result to a result of range")
+@safe pure unittest
+{
+    import std.array : array;
+
+    {
+        auto inputs = [Result!(int, Error)(42), Result!(int, Error)(42)];
+        auto results = inputs.traverse;
+        results.empty.shouldBeFalse;
+        results.get.shouldEqual([42, 42]);
+    }
 }

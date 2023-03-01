@@ -5,6 +5,7 @@ import std.typecons : Nullable;
 import std.traits : isMutable,  isAssignable;
 import std.meta : AliasSeq, allSatisfy;
 import std.sumtype : SumType;
+import std.range;
 
 private enum bool isError(E) = is(E : Error);
 
@@ -205,8 +206,9 @@ if(isResult!T)
     );
 }
 
-/// Extract the success value of a success `Result`
+/// Extract the success value from a success `Result`
 auto get(T)(auto ref T t)
+if(isResult!T)
 {
     import std.sumtype : match;
 
@@ -217,10 +219,45 @@ auto get(T)(auto ref T t)
     );
 }
 
+/// Extract the error from a `Result`
+auto getError(T)(auto ref T t)
+if(isResult!T)
+{
+    import std.sumtype : match;
+    assert(t.isFailure, "Trying to unpack error of a success Result");
+
+    return t.match!(
+        (inout Error e) => e,
+        (inout TypeOfSuccess!T v) => assert(false)
+    );
+}
+
 /// Extract the success value of a success `Result` or the provided fallback if the `Result` is a failure
 inout(U) get(T, U)(auto ref T t, inout(U) fallback)
 if(isResult!T && is(U : TypeOfSuccess!T))
 {
     if(t.isFailure) return fallback;
     return get(t);
+}
+
+
+/// Convert an input range of `Result` to a `Result` of a dynamic array
+Result!(
+    TypeOfSuccess!(ElementType!R)[],
+    TypeOfFailure!(ElementType!R)
+) traverse(R)(R rangeOfResults)
+if(isInputRange!R && isResult!(ElementType!R))
+{
+    import std.algorithm : fold;
+    import std.array : Appender;
+
+    Appender!(TypeOfSuccess!(ElementType!R)[]) acc;
+
+    foreach (ref el; rangeOfResults)
+    {
+        if(el.isFailure)
+            return typeof(return)(el.getError);
+        acc.put(el.get);
+    }
+    return typeof(return)(acc.data);
 }
