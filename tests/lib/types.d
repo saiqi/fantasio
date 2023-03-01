@@ -305,4 +305,10 @@ unittest
         results.empty.shouldBeFalse;
         results.get.shouldEqual([42, 42]);
     }
+
+    {
+        auto inputs = [Result!(int, Error)(42), Result!(int, Error)(new Error(""))];
+        auto results = inputs.traverse;
+        results.isFailure.shouldBeTrue;
+    }
 }

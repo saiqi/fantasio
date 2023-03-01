@@ -1,2 +1,1 @@
 [![CI](https://github.com/saiqi/fantasio/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/saiqi/fantasio/actions/workflows/CI.yml)
-[![codecov](https://codecov.io/gh/saiqi/fantasio/branch/main/graph/badge.svg?token=MXY9QBNK9Q)](https://codecov.io/gh/saiqi/fantasio)
