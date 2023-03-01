@@ -4,7 +4,7 @@ import std.typecons : Nullable;
 import unit_threaded;
 import fantasio.lib.xml;
 
-@("a decoded XML range can be constructed from a range of characters and be namespace agnostic")
+@("decode a namespaced XML text")
 @system unittest
 {
     @XmlRoot("root")
@@ -34,7 +34,7 @@ import fantasio.lib.xml;
     }
 }
 
-@("a fragment of an xml text can be decoded")
+@("decode a fragment of an XML text")
 @system unittest
 {
     @XmlRoot("foo")
@@ -50,7 +50,7 @@ import fantasio.lib.xml;
     r.shouldEqual([Foo(1u), Foo(2u)]);
 }
 
-@("a decoded struct can have primitive typed field from either attributes or text")
+@("decode to a struct having primitive typed fields from attributes or text")
 @system unittest
 {
     @XmlRoot("foo")
@@ -69,7 +69,7 @@ import fantasio.lib.xml;
     r.front.value.shouldEqual(52.6);
 }
 
-@("a decoding operation must fail when a non nullable field is not provided")
+@("decode a not provided non nullable field")
 @system unittest
 {
     @XmlRoot("foo")
@@ -86,7 +86,7 @@ import fantasio.lib.xml;
     "<foo>52.6</foo>".decodeXmlAsRangeOf!Foo.front.shouldThrow;
 }
 
-@("a decoded struct can have a nullable-primitive field")
+@("decode to a struct having nullable-primitive fields")
 @system unittest
 {
     @XmlRoot("foo")
@@ -110,7 +110,7 @@ import fantasio.lib.xml;
     other.id.isNull.shouldBeTrue;
 }
 
-@("a decoded struct can have a nested struct field")
+@("decode to a struct having a nested struct field")
 @system unittest
 {
     @XmlRoot("bar")
@@ -131,7 +131,7 @@ import fantasio.lib.xml;
     foo.shouldEqual(Foo(Bar("42")));
 }
 
-@("the program must not compile if a single element is defined to be decoded as a range")
+@("a single element cannot be decoded to a dynamic array")
 @system unittest
 {
     @XmlRoot("bar")
@@ -153,7 +153,7 @@ import fantasio.lib.xml;
     }));
 }
 
-@("a decoded struct can have a nested nullbale struct field")
+@("decode a struct having a nested nullbale struct field")
 @system unittest
 {
     @XmlRoot("bar")
@@ -182,7 +182,7 @@ import fantasio.lib.xml;
     }
 }
 
-@("a decoded struct can have a nested nullbale struct fields on multiple level")
+@("decode a struct having deeply nested nullbale struct fields")
 @system unittest
 {
     @XmlRoot("baz")
@@ -233,7 +233,7 @@ import fantasio.lib.xml;
     }
 }
 
-@("a decoded struct can have a dynamic array field")
+@("decode a struct having a dynamic array field")
 @system unittest
 {
     @XmlRoot("bar")
@@ -254,7 +254,7 @@ import fantasio.lib.xml;
     foo.shouldEqual(Foo([Bar("42"), Bar("43")]));
 }
 
-@("a decoded struct can have a dynamic array in a nested field")
+@("decode a struct having a nested dynamic array")
 @system unittest
 {
     @XmlRoot("baz")
@@ -289,7 +289,7 @@ import fantasio.lib.xml;
     foo.shouldEqual(Foo(Bar([Baz("42"), Baz("43")])));
 }
 
-@("a decoded struct can have a dynamic array in a nullable nested field")
+@("decode a struct having a dynamic array in a deep nullable field")
 @system unittest
 {
     @XmlRoot("baz")
@@ -325,7 +325,7 @@ import fantasio.lib.xml;
     foo.bar.get.bazs.shouldEqual([Baz("42"), Baz("43")]);
 }
 
-@("a decoded struct can have nested dynamic arrays")
+@("decode a struct having nested dynamic arrays")
 @system unittest
 {
     @XmlRoot("baz")
@@ -379,7 +379,7 @@ import fantasio.lib.xml;
     foo.shouldEqual(Foo(FooBar([Baz("12")]), [Bar([Baz("42"), Baz("43")]), Bar([Baz("44"), Baz("45")])]));
 }
 
-@("all attributes of a node can be decoded in an associative array")
+@("decode all attributes to an associative array")
 @system unittest
 {
     @XmlRoot("foo")
@@ -394,7 +394,7 @@ import fantasio.lib.xml;
     foo.attrs["value"].shouldEqual("bar");
 }
 
-@("all attributes of a node can be decoded in an associative array from a fragmented xml text")
+@("decode all attributes to an associative array from a fragmented XML text")
 @system unittest
 {
     import std.algorithm : joiner;
@@ -411,7 +411,7 @@ import fantasio.lib.xml;
     foo.attrs["value"].shouldEqual("bar");
 }
 
-@("a hierarchical data structure can be decoded")
+@("decode a hierarchical data structure")
 @system unittest
 {
     @XmlRoot("foo")
@@ -438,7 +438,7 @@ import fantasio.lib.xml;
     foo.children[1].children[0].id.shouldEqual(121u);
 }
 
-@("decoding to an inappropriate struct must result in an empty range")
+@("decode to an inappropriate struct")
 @system unittest
 {
     @XmlRoot("foo")
@@ -452,7 +452,7 @@ import fantasio.lib.xml;
     foos.empty.shouldBeTrue;
 }
 
-@("an XML text can be decoded as a single struct")
+@("decode an XML text to a single struct")
 @system unittest
 {
     @XmlRoot("baz")
@@ -496,7 +496,7 @@ import fantasio.lib.xml;
     xmlText.decodeXmlAs!FooBar.shouldThrow;
 }
 
-@("a deeply nested nullable struct can be decoded")
+@("decode a deeply nested nullable struct")
 @system unittest
 {
     import std.typecons : nullable;

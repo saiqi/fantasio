@@ -424,7 +424,6 @@ public:
 }
 
 /// Functions that build `DecodedXml` from a range of characters
-
 DecodedXml!(S, T) decodeXmlAsRangeOf(S, T)(T xmlText) if(isDecodable!T)
 {
     import dxml.parser : parseXML, simpleXML;
