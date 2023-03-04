@@ -55,17 +55,17 @@ struct Category
 
 private template isCollectionnable(T)
 {
-    enum bool isCollectionnable = is(TemplateOf!T == Collection) || is(T == Dimension) || is(
+    enum bool isCollectionnable = __traits(isSame, TemplateOf!T, Collection) || is(T == Dimension) || is(
             T == Dataset);
 }
 
-struct Item(T) //if (isCollectionnable!T)
+struct Item(T) if (isCollectionnable!T)
 {
     T obj;
     Nullable!string type;
 }
 
-struct Link(T) //if (isCollectionnable!T)
+struct Link(T) if (isCollectionnable!T)
 {
     Item!T[] items;
 }
@@ -94,7 +94,7 @@ struct Dataset
     Nullable!(Link!Dimension) link;
 }
 
-struct Collection(T)
+struct Collection(T) if (isCollectionnable!T)
 {
     Nullable!string label;
     string[] note;

@@ -867,6 +867,7 @@ Item!Dataset toItem(const ref SDMX21Dataflow dataflow, Language lang) pure @safe
     return Item!Dataset(Dataset(dataflow.id.get, name.get.content.nullable));
 }
 
+/// Convert a range of dataflows to a collection of datasets
 Collection!Dataset toCollection(R)(auto ref R dataflows, Language lang = DefaultLanguage)
         if ((isInputRange!R || isArray!R) && is(Unqual!(ElementType!R) == SDMX21Dataflow))
 {
