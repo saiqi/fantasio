@@ -1,7 +1,23 @@
 module fantasio.extractors.sdmxml21;
 
 import std.typecons : Nullable;
+import std.range : isInputRange, ElementType;
+import std.traits : Unqual, hasMember, hasUDA, isArray;
 import fantasio.lib.xml;
+import fantasio.core.model;
+import fantasio.core.errors;
+
+struct Class
+{
+    string name;
+}
+
+struct Package
+{
+    string name;
+}
+
+enum ItemScheme;
 
 @XmlRoot("Text")
 struct SDMX21Text
@@ -28,6 +44,8 @@ struct SDMX21Error_
 }
 
 @XmlRoot("Dataflow")
+@Class("Dataflow")
+@Package("datastructure")
 struct SDMX21Dataflow
 {
     @XmlAttr("id")
@@ -56,7 +74,6 @@ struct SDMX21Dataflow
 
     @XmlElement("Ref")
     Nullable!SDMX21Ref ref_;
-
 }
 
 @XmlRoot("Name")
@@ -158,6 +175,9 @@ struct SDMX21LocalRepresentation
 }
 
 @XmlRoot("TimeDimension")
+@Class("TimeDimension")
+@Package("datastructure")
+@ItemScheme
 struct SDMX21TimeDimension
 {
     @XmlAttr("id")
@@ -177,6 +197,9 @@ struct SDMX21TimeDimension
 }
 
 @XmlRoot("Dimension")
+@Class("Dimension")
+@Package("datastructure")
+@ItemScheme
 struct SDMX21Dimension
 {
     @XmlAttr("id")
@@ -225,6 +248,9 @@ struct SDMX21AttributeRelationship
 }
 
 @XmlRoot("Attribute")
+@Class("DataAttribute")
+@Package("datastructure")
+@ItemScheme
 struct SDMX21Attribute
 {
     @XmlAttr("id")
@@ -288,6 +314,9 @@ struct SDMX21Group
 }
 
 @XmlRoot("PrimaryMeasure")
+@Class("PrimaryMeasure")
+@Package("datastructure")
+@ItemScheme
 struct SDMX21PrimaryMeasure
 {
     @XmlAttr("id")
@@ -336,6 +365,8 @@ struct SDMX21DataStructureComponents
 }
 
 @XmlRoot("DataStructure")
+@Class("DataStructure")
+@Package("datastructure")
 struct SDMX21DataStructure
 {
     @XmlAttr("id")
@@ -360,8 +391,10 @@ struct SDMX21DataStructure
     SDMX21DataStructureComponents dataStructureComponents;
 }
 
-
 @XmlRoot("Code")
+@Class("Code")
+@Package("codelist")
+@ItemScheme
 struct SDMX21Code
 {
     @XmlAttr("id")
@@ -378,6 +411,8 @@ struct SDMX21Code
 }
 
 @XmlRoot("Codelist")
+@Class("Codelist")
+@Package("codelist")
 struct SDMX21Codelist
 {
     @XmlAttr("id")
@@ -403,6 +438,9 @@ struct SDMX21Codelist
 }
 
 @XmlRoot("Concept")
+@Class("Concept")
+@Package("conceptscheme")
+@ItemScheme
 struct SDMX21Concept
 {
     @XmlAttr("id")
@@ -419,6 +457,8 @@ struct SDMX21Concept
 }
 
 @XmlRoot("ConceptScheme")
+@Class("ConceptScheme")
+@Package("conceptscheme")
 struct SDMX21ConceptScheme
 {
     @XmlAttr("id")
@@ -444,6 +484,9 @@ struct SDMX21ConceptScheme
 }
 
 @XmlRoot("Category")
+@Class("Category")
+@Package("categoryscheme")
+@ItemScheme
 struct SDMX21Category
 {
     @XmlAttr("id")
@@ -463,6 +506,8 @@ struct SDMX21Category
 }
 
 @XmlRoot("CategoryScheme")
+@Class("CategoryScheme")
+@Package("categoryscheme")
 struct SDMX21CategoryScheme
 {
     @XmlAttr("id")
@@ -502,6 +547,8 @@ struct SDMX21Target
 }
 
 @XmlRoot("Categorisation")
+@Class("Categorisation")
+@Package("categoryscheme")
 struct SDMX21Categorisation
 {
     @XmlAttr("id")
@@ -643,6 +690,9 @@ struct SDMX21Constraints
 }
 
 @XmlRoot("Agency")
+@Class("Agency")
+@Package("base")
+@ItemScheme
 struct SDMX21Agency
 {
     @XmlAttr("id")
@@ -659,6 +709,8 @@ struct SDMX21Agency
 }
 
 @XmlRoot("AgencyScheme")
+@Class("AgencyScheme")
+@Package("base")
 struct SDMX21AgencyScheme
 {
     @XmlAttr("id")
@@ -799,4 +851,31 @@ struct SDMX21DataSet
 
     @XmlElementList("Series")
     SDMX21Series[] series;
+}
+
+Item!Dataset toItem(const ref SDMX21Dataflow dataflow, Language lang) pure @safe
+{
+    import std.typecons : nullable;
+    import std.exception : enforce;
+    import fantasio.core.label : extractLanguage;
+
+    enforce!NotIdentifiableSource(!dataflow.id.isNull, "");
+
+    auto name = dataflow.names.dup.extractLanguage!"lang"(lang);
+    enforce!LanguageNotFound(!name.isNull, lang);
+
+    return Item!Dataset(Dataset(dataflow.id.get, name.get.content.nullable));
+}
+
+Collection!Dataset toCollection(R)(auto ref R dataflows, Language lang = DefaultLanguage)
+        if ((isInputRange!R || isArray!R) && is(Unqual!(ElementType!R) == SDMX21Dataflow))
+{
+    import std.algorithm : map;
+    import std.array : array;
+
+    return Collection!Dataset(
+        (Nullable!string).init,
+        [],
+        Link!Dataset(dataflows.array.map!(df => df.toItem(lang)).array)
+    );
 }

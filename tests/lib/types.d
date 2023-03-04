@@ -279,21 +279,6 @@ unittest
     success.get(43).shouldEqual(42);
 }
 
-@("extract a failure")
-@safe pure unittest
-{
-    class MyError : Error
-    {
-        pure nothrow @nogc @safe this(string msg, Throwable nextInChain = null)
-        {
-            super(msg, nextInChain);
-        }
-    }
-
-    Result!(int, MyError) failure = new MyError("");
-    failure.getError;
-}
-
 @("transform a range of result to a result of range")
 @safe pure unittest
 {

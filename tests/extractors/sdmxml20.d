@@ -27,7 +27,7 @@ private SDMX20DataSet getDataFixture(string name)
         .decodeXmlAs!SDMX20DataSet;
 }
 
-@("an SDMX-ML 2.0 dataflow message can be decoded")
+@("decode an SDMX-ML 2.0 dataflow message")
 unittest
 {
     auto msg = getStructureFixture("dataflow");
@@ -58,7 +58,8 @@ unittest
         ),
     ]));
 }
-@("an SDMX-ML 2.0 codelist, conceptscheme and keyfamily can be decoded")
+
+@("decode an SDMX-ML 2.0 codelist, conceptscheme and keyfamily")
 unittest
 {
     auto msg = getStructureFixture("keyfamily");
@@ -300,7 +301,7 @@ unittest
     ));
 }
 
-@("an SDMX-ML 2.0 data message can be decoded")
+@("decode an SDMX-ML 2.0 data message")
 unittest
 {
     auto msg = getDataFixture("data");
@@ -364,7 +365,7 @@ unittest
     ));
 }
 
-@("an SDMX-ML 2.0 compactdata message can be decoded")
+@("decode an SDMX-ML 2.0 compactdata message")
 unittest
 {
     auto msg = getDataFixture("compactdata");

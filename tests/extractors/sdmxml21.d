@@ -35,7 +35,7 @@ private SDMX21Error_ getErrorFixture()
         .decodeXmlAs!SDMX21Error_;
 }
 
-@("an SDMX-ML 2.1 dataflow message can be decoded")
+@("decode an SDMX-ML 2.1 dataflow message")
 unittest
 {
     auto msg = getStructureFixture("dataflow");
@@ -67,7 +67,7 @@ unittest
         ]));
 }
 
-@("an SDMX-ML 2.1 agencyscheme message can be decoded")
+@("decode an SDMX-ML 2.1 agencyscheme message")
 unittest
 {
     auto msg = getStructureFixture("agencyscheme");
@@ -106,7 +106,7 @@ unittest
     );
 }
 
-@("an SDMX-ML 2.1 categoryscheme message can be decoded")
+@("decode an SDMX-ML 2.1 categoryscheme message")
 unittest
 {
     auto msg = getStructureFixture("categoryscheme");
@@ -150,7 +150,7 @@ unittest
         ]));
 }
 
-@("an SDMX-ML 2.1 categorisation can be decoded")
+@("decode an SDMX-ML 2.1 categorisation")
 unittest
 {
     auto msg = getStructureFixture("categorisation");
@@ -194,7 +194,7 @@ unittest
         ]));
 }
 
-@("an SDMX-ML 2.1 conceptscheme message can be decoded")
+@("decode an SDMX-ML 2.1 conceptscheme message")
 unittest
 {
     auto msg = getStructureFixture("conceptscheme");
@@ -309,7 +309,7 @@ unittest
         ]));
 }
 
-@("an SDMX-ML 2.1 codelist message can be decoded")
+@("decode an SDMX-ML 2.1 codelist message")
 unittest
 {
     auto msg = getStructureFixture("codelist");
@@ -651,7 +651,7 @@ unittest
         ]));
 }
 
-@("an SDMX-ML 2.1 datastructure message can be decoded")
+@("decode an SDMX-ML 2.1 datastructure message")
 unittest
 {
     auto msg = getStructureFixture("datastructure");
@@ -846,7 +846,7 @@ unittest
     );
 }
 
-@("an SDMX-ML 2.1 contentconstraint message can be decoded")
+@("decode an SDMX-ML 2.1 contentconstraint message")
 unittest
 {
     auto msg = getStructureFixture("contentconstraint");
@@ -977,7 +977,7 @@ unittest
         ]));
 }
 
-@("a SDMX-ML 2.1 structure specific data message can be decoded")
+@("decode an SDMX-ML 2.1 structure specific data message")
 unittest
 {
     auto msg = getDataFixture("structurespecificdata");
@@ -1085,7 +1085,7 @@ unittest
     ));
 }
 
-@("an SDMX-ML 2.1 generic data message can be decoded")
+@("decode an SDMX-ML 2.1 generic data message")
 unittest
 {
     auto msg = getDataFixture("genericdata");
@@ -1195,7 +1195,7 @@ unittest
     ));
 }
 
-@("an SDMX-ML 2.1 error message can be decoded")
+@("decode an SDMX-ML 2.1 error message")
 unittest
 {
     auto msg = getErrorFixture();
@@ -1205,4 +1205,47 @@ unittest
             SDMX21Text("La syntaxe de la requete est invalide.".nullable).nullable
         ).nullable
     ));
+}
+
+@("convert dataflows to collection")
+@safe unittest
+{
+    import fantasio.core.model;
+    import fantasio.core.errors;
+
+    auto dataflows = [
+        SDMX21Dataflow(
+            "foo".nullable,
+            (Nullable!string).init,
+            "acme".nullable,
+            "1.0".nullable,
+            (Nullable!bool).init,
+            [SDMX21Name("en", "Foo"), SDMX21Name("fr", "Foo")]
+        ),
+        SDMX21Dataflow(
+            "bar".nullable,
+            (Nullable!string).init,
+            "acme".nullable,
+            "1.0".nullable,
+            (Nullable!bool).init,
+            [SDMX21Name("en", "Bar"), SDMX21Name("fr", "Barre")]
+        ),
+        SDMX21Dataflow()
+    ];
+
+    auto result = dataflows[0 .. 2].toCollection(Language.en);
+
+    auto expected = Collection!Dataset(
+        (Nullable!string).init,
+        [],
+        Link!Dataset([
+            Item!Dataset(Dataset("foo", "Foo".nullable)),
+            Item!Dataset(Dataset("bar", "Bar".nullable))
+        ])
+    );
+    () @trusted { result.shouldEqual(expected); }();
+
+    dataflows.toCollection(Language.es).shouldThrow!LanguageNotFound;
+    dataflows.toCollection(Language.fr).shouldThrow!NotIdentifiableSource;
+
 }

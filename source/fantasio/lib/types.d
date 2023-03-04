@@ -151,6 +151,7 @@ template apply(alias fun)
 {
     import std.functional : unaryFun;
     import std.sumtype : match;
+    import std.meta : NoDuplicates;
 
     auto apply(T)(auto ref T t)
     if(isResult!T)
@@ -163,14 +164,15 @@ template apply(alias fun)
         {
             alias ResultType = Result!(
                 TypeOfSuccess!FunType,
-                AliasSeq!(FailureTypes, TypeOfFailure!FunType));
+                NoDuplicates!(AliasSeq!(FailureTypes, TypeOfFailure!FunType))
+            );
 
             return t.match!(
                 (SuccessType success) {
                     return fun(success)
                         .match!(
                             (TypeOfSuccess!FunType s) => ResultType(s),
-                            (TypeOfFailure!FunType e) => ResultType(e)
+                            failure => ResultType(failure)
                         );
                 },
                 failure => ResultType(failure));
@@ -214,21 +216,8 @@ if(isResult!T)
 
     assert(t.isSuccess, "Trying to unpack value of a failure Result");
     return t.match!(
-        (inout Error e) => assert(false),
-        (inout TypeOfSuccess!T v) => v
-    );
-}
-
-/// Extract the error from a `Result`
-auto getError(T)(auto ref T t)
-if(isResult!T)
-{
-    import std.sumtype : match;
-    assert(t.isFailure, "Trying to unpack error of a success Result");
-
-    return t.match!(
-        (inout Error e) => e,
-        (inout TypeOfSuccess!T v) => assert(false)
+        (inout TypeOfSuccess!T v) => v,
+        _ => assert(false),
     );
 }
 
@@ -248,16 +237,25 @@ Result!(
 ) traverse(R)(R rangeOfResults)
 if(isInputRange!R && isResult!(ElementType!R))
 {
-    import std.algorithm : fold;
+    import std.sumtype : match;
     import std.array : Appender;
+
+    alias RT = typeof(return);
 
     Appender!(TypeOfSuccess!(ElementType!R)[]) acc;
 
     foreach (ref el; rangeOfResults)
     {
         if(el.isFailure)
-            return typeof(return)(el.getError);
+        {
+            return RT(
+                el.match!(
+                    (inout TypeOfSuccess!(typeof(el)) s) => assert(false),
+                    failure => failure
+                )
+            );
+        }
         acc.put(el.get);
     }
-    return typeof(return)(acc.data);
+    return RT(acc.data);
 }
