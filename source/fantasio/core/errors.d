@@ -1,6 +1,6 @@
 module fantasio.core.errors;
 
-class LanguageNotFound : Error
+class LanguageNotFound : Exception
 {
     this(string msg, string file = __FILE__, size_t line = __LINE__) @safe pure
     {
@@ -8,8 +8,15 @@ class LanguageNotFound : Error
     }
 }
 
+class NotIdentifiableSource : Exception
+{
+    this(string msg, string file = __FILE__, size_t line = __LINE__) @safe pure
+    {
+        super(msg, file, line);
+    }
+}
 
-class NotIdentifiableSource : Error
+class InconsitantSource : Exception
 {
     this(string msg, string file = __FILE__, size_t line = __LINE__) @safe pure
     {

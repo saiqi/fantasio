@@ -44,7 +44,7 @@ struct Unit
 
 struct Category
 {
-    string[int] index;
+    string[] index;
     string[string] label;
     string[] note;
     Coordinates[string] coordinates;
@@ -91,7 +91,7 @@ struct Dimension
     Category category;
     Nullable!Date updated;
     Nullable!string source;
-    // Nullable!Link link;
+    Nullable!Link link;
 
     this(this) @safe pure
     {
@@ -110,7 +110,7 @@ struct Dataset
     int[] size;
     Nullable!Role role;
     Dimension[string] dimension;
-    // Nullable!Link link;
+    Nullable!Link link;
 
     this(this) @safe pure
     {

@@ -1408,13 +1408,133 @@ unittest
     () @trusted { collectionByUrn.shouldEqual(expected); }();
 }
 
-@("check purity and safety")
-@safe pure unittest
+@("convert dsd, codelists and conceptschemes to collection")
+@safe unittest
 {
-    SDMX21Dataflow[] dataflows;
-    SDMX21Categorisation[] categorisations;
-    SDMX21CategoryScheme[] schemes;
+    import fantasio.core.model;
 
-    toCollection(dataflows);
-    toCollection(dataflows, schemes, categorisations);
+    // dfmt off
+    auto dsd = SDMX21DataStructure(
+        "0",
+        (Nullable!string).init,
+        "acme",
+        "1.0",
+        [],
+        [],
+        SDMX21DataStructureComponents(
+            SDMX21DimensionList(
+                "list",
+                (Nullable!string).init,
+                SDMX21TimeDimension(
+                    "TIME_PERIOD".nullable,
+                    (Nullable!string).init,
+                    2.nullable,
+                    SDMX21ConceptIdentity(SDMX21Ref(
+                        "TIME_PERIOD",
+                        "1.0".nullable,
+                        "scheme".nullable,
+                        "1.0".nullable,
+                        "acme".nullable,
+                        "conceptscheme".nullable,
+                        "Concept".nullable
+                    )).nullable
+                ),
+                [SDMX21Dimension(
+                    "FREQ".nullable,
+                    (Nullable!string).init,
+                    1.nullable,
+                    SDMX21ConceptIdentity(SDMX21Ref(
+                        "FREQ",
+                        "1.0".nullable,
+                        "scheme".nullable,
+                        "1.0".nullable,
+                        "acme".nullable,
+                        "conceptscheme".nullable,
+                        "Concept".nullable
+                    )).nullable,
+                    SDMX21LocalRepresentation(
+                        (Nullable!SDMX21TextFormat).init,
+                        SDMX21Enumeration(SDMX21Ref(
+                            "CL_FREQ",
+                            "1.0".nullable,
+                            (Nullable!string).init,
+                            (Nullable!string).init,
+                            "acme".nullable,
+                            "codelist".nullable,
+                            "Codelist".nullable
+                        )).nullable
+                    ).nullable
+                )]
+            )
+        )
+    );
+    // dfmt on
+
+    auto conceptschemes = [
+        SDMX21ConceptScheme(
+            "scheme",
+            (Nullable!string).init,
+            "acme",
+            "1.0",
+            [],
+            [],
+            [
+                SDMX21Concept(
+                    "TIME_PERIOD",
+                    (Nullable!string).init,
+                    [SDMX21Name("en", "Time Period")],
+                    []
+                ),
+                SDMX21Concept(
+                    "FREQ",
+                    (Nullable!string).init,
+                    [SDMX21Name("en", "Frequency")],
+                    []
+                )
+            ]
+        )
+    ];
+
+    auto codelists = [
+        SDMX21Codelist(
+            "CL_FREQ",
+            (Nullable!string).init,
+            "acme",
+            "1.0",
+            [SDMX21Name("en", "Frequency")],
+            [],
+            [
+                SDMX21Code(
+                    "A",
+                    (Nullable!string).init,
+                    [SDMX21Name("en", "Annual")],
+                    []
+                )
+            ]
+        )
+    ];
+
+    auto result = dsd.toCollection(conceptschemes, codelists);
+
+    // dfmt off
+    auto expected = Collection(
+        (Nullable!string).init,
+        [],
+        Link([
+            Item(ItemT(Dimension(
+                "Frequency".nullable,
+                [],
+                Category(
+                    ["A"],
+                    ["A": "Annual"]
+                )
+            ))),
+            Item(ItemT(Dimension(
+                "Time Period".nullable,
+            )))
+        ])
+    );
+    // dfmt on
+
+    () @trusted { result.shouldEqual(expected); }();
 }

@@ -897,12 +897,19 @@ struct SDMX21DataSet
 
 }
 
-private auto curate(R)(auto ref R dataflows) if (isIterableOf!(R, SDMX21Dataflow))
+private auto curateAndSort(R)(auto ref R dataflows)
+        if (isIterableOf!(R, SDMX21Dataflow))
 {
-    import std.algorithm : filter;
+    import std.algorithm : filter, sort;
+    import std.array : array;
 
     return dataflows
-        .filter!(df => !df.id.isNull && !df.agencyId.isNull && !df.version_.isNull);
+        .filter!(df => !df.id.isNull && !df.agencyId.isNull && !df.version_.isNull)
+        .array
+        .sort!((a, b) =>
+                a.id.get < b.id.get
+                && a.agencyId.get < b.agencyId.get
+                && a.version_.get < b.version_.get);
 }
 
 private auto getDataflowsByCategoryId(RDF, RC)(
@@ -918,13 +925,7 @@ private auto getDataflowsByCategoryId(RDF, RC)(
     import std.array : array;
     import fantasio.lib.operations : join;
 
-    auto sortedDataflows = dataflows
-        .curate
-        .array
-        .sort!((a, b) =>
-                a.id.get < b.id.get
-                && a.agencyId.get < b.agencyId.get
-                && a.version_.get < b.version_.get);
+    auto sortedDataflows = dataflows.curateAndSort;
 
     return categorisations
         .filter!(c =>
@@ -974,13 +975,7 @@ private auto getDataflowsByCategoryUrn(RDF, RC)(
         format!"Caterory %s URN is null"(category.id)
     );
 
-    auto sortedDataflows = dataflows
-        .curate
-        .array
-        .sort!((a, b) =>
-                a.id.get < b.id.get
-                && a.agencyId.get < b.agencyId.get
-                && a.version_.get < b.version_.get);
+    auto sortedDataflows = dataflows.curateAndSort;
 
     return categorisations
         .filter!(c =>
@@ -1092,17 +1087,134 @@ private Collection getCollectionFromCategoryScheme(RDF, RC)(
     return Collection(name.get.content.nullable, [], Link(items));
 }
 
+private SDMX21Concept findConcept(RCS)(const ref SDMX21Ref ref_, auto ref RCS conceptschemes)
+        if (isIterableOf!(RCS, SDMX21ConceptScheme))
+{
+    import std.exception : enforce;
+    import std.format : format;
+    import std.algorithm : filter, map, joiner;
+
+    enforce!NotIdentifiableSource(ref_.isValidForSchemeLookup, "");
+
+    auto concepts = conceptschemes
+        .filter!(
+            cs => cs.id == ref_.maintainableParentId.get
+                && cs.agencyId == ref_.agencyId.get
+                && cs.version_ == ref_.maintainableParentVersion.get
+        )
+        .map!(cs => cs.concepts)
+        .joiner
+        .filter!(c => c.id == ref_.id);
+
+    enforce!InconsitantSource(
+        !concepts.empty,
+        format!"Could not find concept %s from conceptschemes"(ref_.id));
+
+    return concepts.front;
+}
+
+private Category getDimensionCategory(RCL, T)(
+    auto ref T dimension,
+    auto ref RCL codelists,
+    Language lang
+)
+        if (
+            (is(Unqual!T == SDMX21Dimension) || is(Unqual!T == SDMX21TimeDimension))
+        && isIterableOf!(RCL, SDMX21Codelist))
+{
+    import std.exception : enforce;
+    import std.format : format;
+    import std.algorithm : filter, map, joiner;
+    import std.typecons : Tuple, tuple;
+    import std.array : array, Appender, assocArray;
+    import fantasio.core.label : extractLanguage;
+
+    if (dimension.localRepresentation.isNull
+        || dimension.localRepresentation.get.enumeration.isNull)
+    {
+        return Category();
+    }
+
+    auto ref_ = dimension.localRepresentation.get.enumeration.get.ref_;
+
+    enforce!InconsitantSource(
+        ref_.isValidForLookup,
+        format!"Codelist of dimension %s could not be found"(dimension.id.get)
+    );
+
+    Appender!(string[]) indexApp;
+    Appender!(Tuple!(string, string)[]) labelApp;
+
+    auto codes = codelists
+        .filter!(
+            cl => cl.id == ref_.id
+                && cl.agencyId == ref_.agencyId.get
+                && cl.version_ == ref_.version_.get
+        )
+        .map!(cl => cl.codes)
+        .joiner;
+
+    foreach (c; codes)
+    {
+        auto name = c.names.dup.extractLanguage!"lang"(lang);
+        enforce!LanguageNotFound(!name.isNull, lang);
+
+        indexApp.put(c.id);
+        labelApp.put(tuple(c.id, name.get.content));
+    }
+
+    return Category(indexApp.data, labelApp.data.assocArray);
+}
+
+private Dimension getDimension(RCS, RCL, T)(
+    auto ref T dimension,
+    auto ref RCS conceptschemes,
+    auto ref RCL codelists,
+    Language lang
+)
+        if (
+            (is(Unqual!T == SDMX21Dimension) || is(Unqual!T == SDMX21TimeDimension))
+        && isIterableOf!(RCS, SDMX21ConceptScheme)
+        && isIterableOf!(RCL, SDMX21Codelist))
+{
+    import std.exception : enforce;
+    import std.format : format;
+    import std.typecons : apply;
+    import fantasio.core.label : extractLanguage;
+
+    enforce!NotIdentifiableSource(!dimension.id.isNull, "");
+
+    enforce!InconsitantSource(
+        !dimension.conceptIdentity.isNull,
+        format!"Concept id of dimension %s is null"(dimension.id.get));
+
+    auto concept = findConcept(dimension.conceptIdentity.get.ref_, conceptschemes);
+    auto label = concept.names.dup.extractLanguage!"lang"(lang);
+
+    auto category = dimension.getDimensionCategory(codelists, lang);
+
+    return Dimension(
+        label.apply!"a.content",
+        [],
+        category
+    );
+}
+
 /// Convert a range of dataflows to a collection of datasets
 Collection toCollection(R)(auto ref R dataflows, Language lang = DefaultLanguage)
         if (isIterableOf!(R, SDMX21Dataflow))
 {
-    import std.algorithm : map;
+    import std.algorithm : map, filter;
     import std.array : array;
 
     return Collection(
         (Nullable!string).init, // TODO populate label
         [],
-        Link(dataflows.curate.map!(df => df.getItemFromDataflow(lang)).array)
+        Link(dataflows
+            .filter!(df => !df.id.isNull && !df.agencyId.isNull && !df.version_.isNull)
+            .map!(df => df.getItemFromDataflow(lang))
+            .array
+        )
     );
 }
 
@@ -1128,4 +1240,41 @@ Collection toCollection(RDF, RCS, RC)(
         )
         .array;
     return Collection((Nullable!string).init, [], Link(collections));
+}
+
+/// Convert a datastructure to a collection of dimensions
+Collection toCollection(RCS, RCL)(
+    const ref SDMX21DataStructure dsd,
+    auto ref RCS conceptschemes,
+    auto ref RCL codelists,
+    Language lang = DefaultLanguage
+) if (isIterableOf!(RCS, SDMX21ConceptScheme) && isIterableOf!(RCL, SDMX21Codelist))
+{
+    import std.algorithm : sort, map, all;
+    import std.range : chain;
+    import std.array : array;
+    import std.exception : enforce;
+
+    auto sdmxDims = dsd.dataStructureComponents.dimensionList.dimensions;
+    auto sdmxTimeDim = dsd.dataStructureComponents.dimensionList.timeDimension;
+
+    enforce!InconsitantSource(
+        sdmxDims.all!(d => !d.position.isNull),
+        "At least one dimension has a null position"
+    );
+
+    auto dimensions = sdmxDims
+        .dup
+        .sort!((a, b) => a.position.get < b.position.get)
+        .map!(d => Item(ItemT(getDimension(d, conceptschemes, codelists, lang))))
+        .chain([
+            Item(ItemT(getDimension(sdmxTimeDim, conceptschemes, codelists, lang)))
+        ])
+        .array;
+
+    return Collection(
+        (Nullable!string).init,
+        [],
+        Link(dimensions)
+    );
 }
