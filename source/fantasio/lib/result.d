@@ -1,8 +1,8 @@
-module fantasio.lib.types;
+module fantasio.lib.result;
 
 import core.attribute : mustuse;
 import std.typecons : Nullable;
-import std.traits : isMutable,  isAssignable;
+import std.traits : isMutable, isAssignable;
 import std.meta : AliasSeq, allSatisfy;
 import std.sumtype : SumType;
 import std.range;
@@ -10,8 +10,7 @@ import std.range;
 private enum bool isError(E) = is(E : Error);
 
 /// A struct that can be either a success of type `T` or a failure of type `Error`
-@mustuse struct Result(T, E ...)
-if(allSatisfy!(isError, AliasSeq!E))
+@mustuse struct Result(T, E...) if (allSatisfy!(isError, AliasSeq!E))
 {
     SumType!(T, E) payload;
     alias payload this;
@@ -26,7 +25,7 @@ if(allSatisfy!(isError, AliasSeq!E))
         this._value = this.payload.get;
     }
 
-    static foreach(ET; AliasSeq!E)
+    static foreach (ET; AliasSeq!E)
     {
         this(ET e) pure
         {
@@ -34,28 +33,30 @@ if(allSatisfy!(isError, AliasSeq!E))
             this._isSuccess = false;
         }
 
-        auto ref opAssign()(ET error) if(isMutable!T)
+        auto ref opAssign()(ET error) if (isMutable!T)
         {
-            (() @trusted {this.payload = error;})();
+            (() @trusted { this.payload = error; })();
             this._isSuccess = false;
             return this;
         }
     }
 
-    auto ref opAssign(U : T)(auto ref U value) if(isMutable!T && isAssignable!(T, U))
+    auto ref opAssign(U : T)(auto ref U value)
+            if (isMutable!T && isAssignable!(T, U))
     {
-        (() @trusted {this.payload = value;})();
+        (() @trusted { this.payload = value; })();
         this._isSuccess = true;
         this._value = this.payload.get;
         return this;
     }
 
-    auto ref opAssign(U : T, E ...)(auto ref Result!(U, E) value)
-    if(isMutable!T && isAssignable!(T, U) && allSatisfy!(isError, AliasSeq!E))
+    auto ref opAssign(U : T, E...)(auto ref Result!(U, E) value)
+            if (isMutable!T && isAssignable!(T, U) && allSatisfy!(isError, AliasSeq!E))
     {
         import std.algorithm.mutation : move;
-        (() @trusted {this.payload = move(value);})();
-        if(this.payload.isSuccess)
+
+        (() @trusted { this.payload = move(value); })();
+        if (this.payload.isSuccess)
             this._value = this.payload.get;
         else
             this._value = T.init;
@@ -79,33 +80,15 @@ if(allSatisfy!(isError, AliasSeq!E))
     }
 }
 
-/// Return true if `T` is an instance of `std.typecons.Nullable`
-enum bool isNullable(T) = is(T: Nullable!Arg, Arg);
-alias NullableOf(T: Nullable!Arg, Arg) = Arg;
-
-/**
-  * Apply a compile-time predicate with arguments `Args` to a type `T`.
-  * If `T` is a `std.typecons.Nullable` the predicate will be applied to the corresponding underlying type
-  * (i.e. `ST` from `Nullable!ST`).
-  * Otherwise, the predicate will be applied on `T`
-  */
-template unpack(T, alias pred, Args ...)
-{
-    static if(isNullable!T)
-        enum unpack = pred!(NullableOf!T, Args);
-    else
-        enum unpack = pred!(T, Args);
-}
-
-private alias TypeOfSuccess(T: SumType!(Arg, E), Arg, E...) = Arg;
-private alias TypeOfFailure(T: SumType!(Arg, E), Arg, E...) = E;
+private alias TypeOfSuccess(T : SumType!(Arg, E), Arg, E...) = Arg;
+private alias TypeOfFailure(T : SumType!(Arg, E), Arg, E...) = E;
 
 /// Return true if `T` is an instance of `fantasio.lib.types.Result`
 template isResult(T)
 {
-    static if(is(T: SumType!(Arg, E), Arg, E...))
+    static if (is(T : SumType!(Arg, E), Arg, E...))
     {
-        static if(is(TypeOfFailure!T))
+        static if (is(TypeOfFailure!T))
             enum bool isResult = allSatisfy!(isError, AliasSeq!(TypeOfFailure!T));
         else
             enum bool isResult = false;
@@ -115,8 +98,7 @@ template isResult(T)
 }
 
 /// Return true if a `Result` `t` is not an error
-bool isSuccess(T)(auto ref inout T t)
-if(isResult!T)
+bool isSuccess(T)(auto ref inout T t) if (isResult!T)
 {
     import std.sumtype : match;
 
@@ -129,8 +111,7 @@ if(isResult!T)
 }
 
 /// Return true if a `Result` `t` is an error
-bool isFailure(T)(auto ref inout T t)
-if(isResult!T)
+bool isFailure(T)(auto ref inout T t) if (isResult!T)
 {
     return !isSuccess(t);
 }
@@ -153,14 +134,13 @@ template apply(alias fun)
     import std.sumtype : match;
     import std.meta : NoDuplicates;
 
-    auto apply(T)(auto ref T t)
-    if(isResult!T)
+    auto apply(T)(auto ref T t) if (isResult!T)
     {
         alias SuccessType = TypeOfSuccess!T;
         alias FailureTypes = TypeOfFailure!T;
         alias FunType = typeof(unaryFun!fun(SuccessType.init));
 
-        static if(isResult!FunType)
+        static if (isResult!FunType)
         {
             alias ResultType = Result!(
                 TypeOfSuccess!FunType,
@@ -169,12 +149,12 @@ template apply(alias fun)
 
             return t.match!(
                 (SuccessType success) {
-                    return fun(success)
-                        .match!(
-                            (TypeOfSuccess!FunType s) => ResultType(s),
-                            failure => ResultType(failure)
-                        );
-                },
+                return fun(success)
+                    .match!(
+                        (TypeOfSuccess!FunType s) => ResultType(s),
+                        failure => ResultType(failure)
+                    );
+            },
                 failure => ResultType(failure));
         }
         else
@@ -194,8 +174,7 @@ Params:
 Returns:
     a `(Nullable!TypeOfSuccess)`
 */
-auto toNullable(T)(auto ref T t)
-if(isResult!T)
+auto toNullable(T)(auto ref T t) if (isResult!T)
 {
     import std.traits : CopyConstness;
     import std.sumtype : match;
@@ -209,8 +188,7 @@ if(isResult!T)
 }
 
 /// Extract the success value from a success `Result`
-auto get(T)(auto ref T t)
-if(isResult!T)
+auto get(T)(auto ref T t) if (isResult!T)
 {
     import std.sumtype : match;
 
@@ -223,19 +201,18 @@ if(isResult!T)
 
 /// Extract the success value of a success `Result` or the provided fallback if the `Result` is a failure
 inout(U) get(T, U)(auto ref T t, inout(U) fallback)
-if(isResult!T && is(U : TypeOfSuccess!T))
+        if (isResult!T && is(U : TypeOfSuccess!T))
 {
-    if(t.isFailure) return fallback;
+    if (t.isFailure)
+        return fallback;
     return get(t);
 }
-
 
 /// Convert an input range of `Result` to a `Result` of a dynamic array
 Result!(
     TypeOfSuccess!(ElementType!R)[],
     TypeOfFailure!(ElementType!R)
-) traverse(R)(R rangeOfResults)
-if(isInputRange!R && isResult!(ElementType!R))
+) traverse(R)(R rangeOfResults) if (isInputRange!R && isResult!(ElementType!R))
 {
     import std.sumtype : match;
     import std.array : Appender;
@@ -246,13 +223,13 @@ if(isInputRange!R && isResult!(ElementType!R))
 
     foreach (ref el; rangeOfResults)
     {
-        if(el.isFailure)
+        if (el.isFailure)
         {
             return RT(
                 el.match!(
                     (inout TypeOfSuccess!(typeof(el)) s) => assert(false),
                     failure => failure
-                )
+            )
             );
         }
         acc.put(el.get);

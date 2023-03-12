@@ -3,7 +3,6 @@ module fantasio.core.model;
 import std.typecons : Nullable;
 import std.sumtype : SumType;
 import std.datetime : Date;
-import std.traits : TemplateOf;
 
 enum Language : string
 {
@@ -51,23 +50,38 @@ struct Category
     Coordinates[string] coordinates;
     Unit[string] unit;
     string[] child;
+
+    this(this) @safe pure
+    {
+        index = index.dup;
+        label = label.dup;
+        note = note.dup;
+        coordinates = coordinates.dup;
+        unit = unit.dup;
+        child = child.dup;
+    }
 }
 
-private template isCollectionnable(T)
-{
-    enum bool isCollectionnable = __traits(isSame, TemplateOf!T, Collection) || is(T == Dimension) || is(
-            T == Dataset);
-}
+alias ItemT = SumType!(Collection, Dataset, Dimension);
 
-struct Item(T) if (isCollectionnable!T)
+struct Item
 {
-    T obj;
+    ItemT obj;
     Nullable!string type;
+
+    this(this) @safe pure
+    {
+    }
 }
 
-struct Link(T) if (isCollectionnable!T)
+struct Link
 {
-    Item!T[] items;
+    Item[] items;
+
+    this(this) @safe pure
+    {
+        items = items.dup;
+    }
 }
 
 struct Dimension
@@ -77,7 +91,12 @@ struct Dimension
     Category category;
     Nullable!Date updated;
     Nullable!string source;
-    Nullable!(Link!Dataset) link;
+    // Nullable!Link link;
+
+    this(this) @safe pure
+    {
+        note = note.dup;
+    }
 }
 
 struct Dataset
@@ -91,14 +110,27 @@ struct Dataset
     int[] size;
     Nullable!Role role;
     Dimension[string] dimension;
-    Nullable!(Link!Dimension) link;
+    // Nullable!Link link;
+
+    this(this) @safe pure
+    {
+        note = note.dup;
+        value = value.dup;
+        size = size.dup;
+        dimension = dimension.dup;
+    }
 }
 
-struct Collection(T) if (isCollectionnable!T)
+struct Collection
 {
     Nullable!string label;
     string[] note;
-    Link!T link;
+    Link link;
     Nullable!Date updated;
     Nullable!string source;
+
+    this(this) @safe pure
+    {
+        note = note.dup;
+    }
 }

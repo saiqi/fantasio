@@ -1,12 +1,13 @@
-module tests.lib.types;
+module tests.lib.result;
 
 import unit_threaded;
-import fantasio.lib.types;
+import fantasio.lib.result;
 
 @("a result can be assigned")
 @safe unittest
 {
     import std.algorithm : map;
+
     auto success = Result!(int, Error)(42);
     success.get.shouldEqual(42);
 
@@ -54,6 +55,7 @@ import fantasio.lib.types;
 unittest
 {
     import std.range : isInputRange;
+
     static assert(isInputRange!(Result!(int, Error)));
     Result!(int, Error) r = 42;
     r.front.shouldEqual(42);
@@ -70,8 +72,9 @@ unittest
 
     Result!(int, Error) reciprocal(const int v) pure nothrow @safe
     {
-        if(v == 0) return Result!(int, Error)(new Error(""));
-        return Result!(int, Error)(1/v);
+        if (v == 0)
+            return Result!(int, Error)(new Error(""));
+        return Result!(int, Error)(1 / v);
     }
 
     iota(2)
@@ -86,8 +89,9 @@ unittest
 {
     Result!(int, Error) reciprocal(int v) pure nothrow @safe
     {
-        if(v == 0) return Result!(int, Error)(new Error("Division by zero"));
-        return Result!(int, Error)(1/v);
+        if (v == 0)
+            return Result!(int, Error)(new Error("Division by zero"));
+        return Result!(int, Error)(1 / v);
     }
 
     reciprocal(1).isSuccess.shouldBeTrue;
@@ -109,6 +113,7 @@ unittest
 @safe pure unittest
 {
     import std.conv : to;
+
     Result!(int, Error) success = 42;
     Result!(string, Error) result = success.apply!(a => a.to!string);
     result.isSuccess.shouldBeTrue;
@@ -153,7 +158,7 @@ unittest
         {
             return Result!(int, ParserError)(s.to!int);
         }
-        catch(Exception e)
+        catch (Exception e)
         {
             return Result!(int, ParserError)(new ParserError(("Parsing of " ~ s ~ " failed")));
         }
@@ -161,8 +166,9 @@ unittest
 
     Result!(double, ZeroDivisionError) reciprocal(int i) nothrow
     {
-        if(i == 0) return Result!(double, ZeroDivisionError)(new ZeroDivisionError("Division by zero"));
-        return Result!(double, ZeroDivisionError)(1/i);
+        if (i == 0)
+            return Result!(double, ZeroDivisionError)(new ZeroDivisionError("Division by zero"));
+        return Result!(double, ZeroDivisionError)(1 / i);
     }
 
     auto success = parse("2")
@@ -200,12 +206,13 @@ unittest
 @("convert a success result to a non-null nullable")
 @safe pure unittest
 {
-        Result!(int, Error) success = 42;
-        success.toNullable.get.shouldEqual(42);
+    Result!(int, Error) success = 42;
+    success.toNullable.get.shouldEqual(42);
 }
 
 @("convert a failure result to a null nullable")
-@safe pure unittest {
+@safe pure unittest
+{
     Result!(int, Error) failure = new Error("");
     failure.toNullable.isNull.should == true;
 }
@@ -292,7 +299,9 @@ unittest
     }
 
     {
-        auto inputs = [Result!(int, Error)(42), Result!(int, Error)(new Error(""))];
+        auto inputs = [
+            Result!(int, Error)(42), Result!(int, Error)(new Error(""))
+        ];
         auto results = inputs.traverse;
         results.isFailure.shouldBeTrue;
     }

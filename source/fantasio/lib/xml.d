@@ -7,11 +7,12 @@ import std.traits : isSomeChar, hasUDA;
 private:
 enum bool isDecodable(T) = isForwardRange!T && isSomeChar!(ElementType!T);
 
-template rootName(T) if(hasUDA!(T, XmlRoot))
+template rootName(T) if (hasUDA!(T, XmlRoot))
 {
     import std.traits : isArray, getUDAs;
     import std.range : ElementType;
-    static if(isArray!T)
+
+    static if (isArray!T)
         enum rootName = getUDAs!(ElementType!T, XmlRoot)[0].tagName;
     else
         enum rootName = getUDAs!(T, XmlRoot)[0].tagName;
@@ -23,9 +24,9 @@ template elementName(T, string name)
 
     alias member = __traits(getMember, T, name);
 
-    static if(hasUDA!(member, XmlElement))
+    static if (hasUDA!(member, XmlElement))
         enum elementName = getUDAs!(member, XmlElement)[0].tagName;
-    else static if(hasUDA!(member, XmlElementList))
+    else static if (hasUDA!(member, XmlElementList))
         enum elementName = getUDAs!(member, XmlElementList)[0].tagName;
     else
         static assert(false);
@@ -38,22 +39,22 @@ template checkElementType(T, string name)
     alias member = __traits(getMember, T, name);
     enum bool isList = isArray!(typeof(member));
 
-    static if(hasUDA!(member, XmlElement))
+    static if (hasUDA!(member, XmlElement))
         enum bool checkElementType = !isList;
-    else static if(hasUDA!(member, XmlElementList))
+    else static if (hasUDA!(member, XmlElementList))
         enum bool checkElementType = isList;
     else
         static assert(false);
 }
 
-string cleanNs(R)(R tagName) if(isDecodable!R)
+string cleanNs(R)(R tagName) if (isDecodable!R)
 {
     import std.algorithm : splitter, fold;
     import std.traits : isArray;
     import std.array : array;
     import std.conv : to;
 
-    static if(isArray!R)
+    static if (isArray!R)
         return tagName.splitter(":").fold!((a, b) => b);
     else
         return tagName
@@ -81,7 +82,8 @@ class MemoryManager
 
     Appender!(string[]) getAppender()
     {
-        if(this.appenders.data.empty) return appender!(string[]);
+        if (this.appenders.data.empty)
+            return appender!(string[]);
 
         auto appender = this.appenders.data.back;
 
@@ -144,7 +146,7 @@ class XMLDecodingException : Exception
  * Constructor is private, use `decodeXmlAs` instead
  * Throws: XMLDecodingException when a non optional field (not defined as `Nullable`) is missing
  */
-struct DecodedXml(S, T = string) if(isDecodable!T && hasUDA!(S, XmlRoot))
+struct DecodedXml(S, T = string) if (isDecodable!T && hasUDA!(S, XmlRoot))
 {
     import dxml.parser : EntityType, EntityRange, simpleXML;
 
@@ -166,17 +168,19 @@ private:
 
     void prime()
     {
-        if(this._primed) return;
-        while(!isNextEntityReached)
+        if (this._primed)
+            return;
+        while (!isNextEntityReached)
             this._entities.popFront();
         this._primed = true;
-        if(!this._entities.empty)
+        if (!this._entities.empty)
             buildCurrent();
     }
 
     bool isNextEntityReached()
     {
-        if(this._entities.empty) return true;
+        if (this._entities.empty)
+            return true;
         auto entity = this._entities.front;
         return this._endOfFragment
             || (entity.type == EntityType.elementStart && entity.name.cleanNs == rootName!S);
@@ -191,85 +195,88 @@ private:
         import std.exception : enforce;
         import std.format : format;
         import std.typecons : tuple;
-        import fantasio.lib.types : NullableOf, isNullable;
+        import fantasio.lib.traits : NullableOf, isNullable;
 
         static foreach (m; __traits(allMembers, ST))
-        {{
-            alias Member = __traits(getMember, ST, m);
-            alias MemberT = typeof(Member);
-
-            static if(hasUDA!(Member, XmlAttr))
+        {
             {
-                auto attrs = this._entities.front.attributes
-                    .find!(a => a.name.cleanNs == getUDAs!(Member, XmlAttr)[0].name);
+                alias Member = __traits(getMember, ST, m);
+                alias MemberT = typeof(Member);
 
-                static if(isNullable!MemberT)
+                static if (hasUDA!(Member, XmlAttr))
                 {
-                    alias NT = NullableOf!MemberT;
-                    if(!attrs.empty)
-                        __traits(getMember, source, m) = attrs.front.value.to!NT;
+                    auto attrs = this._entities.front.attributes
+                        .find!(a => a.name.cleanNs == getUDAs!(Member, XmlAttr)[0].name);
+
+                    static if (isNullable!MemberT)
+                    {
+                        alias NT = NullableOf!MemberT;
+                        if (!attrs.empty)
+                            __traits(getMember, source, m) = attrs.front.value.to!NT;
+                    }
+                    else
+                    {
+                        enforce!XMLDecodingException(!attrs.empty,
+                            format!"Not nullable field %s not provided"(m));
+                        __traits(getMember, source, m) = attrs.front.value.to!MemberT;
+                    }
                 }
-                else
+                else static if (hasUDA!(Member, XmlText))
                 {
-                    enforce!XMLDecodingException(!attrs.empty,
-                        format!"Not nullable field %s not provided"(m));
-                    __traits(getMember, source, m) = attrs.front.value.to!MemberT;
+                    auto copy = this._entities.save;
+                    copy.popFront();
+
+                    static if (isNullable!MemberT)
+                    {
+                        alias NT = NullableOf!MemberT;
+                        if (copy.front.type == EntityType.text)
+                            __traits(getMember, source, m) = copy.front.text.to!NT;
+                    }
+                    else
+                    {
+                        enforce!XMLDecodingException(copy.front.type == EntityType.text,
+                            format!"Not nullable field %s not provided"(m));
+                        __traits(getMember, source, m) = copy.front.text.to!MemberT;
+                    }
+                }
+                else static if (hasUDA!(Member, XmlAllAttrs))
+                {
+                    static assert(isAssociativeArray!MemberT
+                            && is(KeyType!MemberT : string)
+                            && isDecodable!(ValueType!MemberT), "all attributes can only be decoded in an AA");
+
+                    static if (is(ValueType : string))
+                        __traits(getMember, source, m) = this._entities.front.attributes
+                            .map!(a => tuple(a.name.cleanNs, a.value))
+                            .assocArray;
+                    else
+                        __traits(getMember, source, m) = this._entities.front.attributes
+                            .map!(a => tuple(a.name.cleanNs, a.value.array.to!string))
+                            .assocArray;
                 }
             }
-            else static if(hasUDA!(Member, XmlText))
-            {
-                auto copy = this._entities.save;
-                copy.popFront();
-
-                static if(isNullable!MemberT)
-                {
-                    alias NT = NullableOf!MemberT;
-                    if(copy.front.type == EntityType.text)
-                        __traits(getMember, source, m) = copy.front.text.to!NT;
-                }
-                else
-                {
-                    enforce!XMLDecodingException(copy.front.type == EntityType.text,
-                        format!"Not nullable field %s not provided"(m));
-                    __traits(getMember, source, m) = copy.front.text.to!MemberT;
-                }
-            }
-            else static if(hasUDA!(Member, XmlAllAttrs))
-            {
-                static assert(isAssociativeArray!MemberT
-                    && is(KeyType!MemberT : string)
-                    && isDecodable!(ValueType!MemberT), "all attributes can only be decoded in an AA");
-
-                static if(is(ValueType : string))
-                    __traits(getMember, source, m) = this._entities.front.attributes
-                        .map!(a => tuple(a.name.cleanNs, a.value))
-                        .assocArray;
-                else
-                    __traits(getMember, source, m) = this._entities.front.attributes
-                        .map!(a => tuple(a.name.cleanNs, a.value.array.to!string))
-                        .assocArray;
-            }
-        }}
+        }
     }
 
     void setValue(ST)(ref ST source, string[] path)
     {
         import std.traits : isArray;
-        import fantasio.lib.types : isNullable, NullableOf, unpack;
+        import fantasio.lib.traits : isNullable, NullableOf, unpack;
 
         assert(path.length > 0);
 
         bool isLeaf = path.length == 1;
 
-        if(!isLeaf) path = path[1 .. $];
+        if (!isLeaf)
+            path = path[1 .. $];
 
-        static if(isArray!ST)
+        static if (isArray!ST)
         {
             alias ET = ElementType!ST;
 
             static assert(!isNullable!ET, "arrays of nullable are not supported");
 
-            if(isLeaf)
+            if (isLeaf)
             {
                 auto item = ET.init;
                 setValue(item, path);
@@ -278,30 +285,32 @@ private:
             else
             {
                 static foreach (m; allChildren!ET)
-                {{
-                    if(elementName!(ET, m) == path[0])
+                {
                     {
-                        static assert(checkElementType!(ET, m),
-                            m ~ " is not a range but is defined to be decoded as an array");
-
-                        alias CT = typeof(__traits(getMember, source[$ - 1], m));
-                        static if(isNullable!CT)
+                        if (elementName!(ET, m) == path[0])
                         {
-                            if(__traits(getMember, source[$ - 1], m).isNull)
-                                __traits(getMember, source[$ - 1], m) = NullableOf!CT();
+                            static assert(checkElementType!(ET, m),
+                                m ~ " is not a range but is defined to be decoded as an array");
+
+                            alias CT = typeof(__traits(getMember, source[$ - 1], m));
+                            static if (isNullable!CT)
+                            {
+                                if (__traits(getMember, source[$ - 1], m).isNull)
+                                    __traits(getMember, source[$ - 1], m) = NullableOf!CT();
+                            }
+                            setValue(__traits(getMember, source[$ - 1], m), path);
                         }
-                        setValue(__traits(getMember, source[$ - 1], m), path);
                     }
-                }}
+                }
             }
         }
         else
         {
-            if(isLeaf)
+            if (isLeaf)
             {
-                static if(isNullable!ST)
+                static if (isNullable!ST)
                 {
-                    if(!source.isNull)
+                    if (!source.isNull)
                         setLeafValue(source.get);
                 }
                 else
@@ -310,37 +319,39 @@ private:
             else
             {
                 static foreach (m; unpack!(ST, allChildren))
-                {{
-                    if(unpack!(ST, elementName, m) == path[0])
+                {
                     {
-                        static assert(unpack!(ST, checkElementType, m),
-                            m ~ " is a range but is defined to be decoded as a single element");
-
-                        static if(isNullable!ST)
-                            alias CT = typeof(__traits(getMember, NullableOf!ST, m));
-                        else
-                            alias CT = typeof(__traits(getMember, ST, m));
-
-                        static if(isNullable!CT)
+                        if (unpack!(ST, elementName, m) == path[0])
                         {
-                            static if(isNullable!ST)
-                            {
-                                if(__traits(getMember, source.get, m).isNull)
-                                    __traits(getMember, source.get, m) = NullableOf!CT();
-                            }
-                            else
-                            {
-                                if(__traits(getMember, source, m).isNull)
-                                    __traits(getMember, source, m) = NullableOf!CT();
-                            }
-                        }
+                            static assert(unpack!(ST, checkElementType, m),
+                                m ~ " is a range but is defined to be decoded as a single element");
 
-                        static if(isNullable!ST)
-                            setValue(__traits(getMember, source.get, m), path);
-                        else
-                            setValue(__traits(getMember, source, m), path);
+                            static if (isNullable!ST)
+                                alias CT = typeof(__traits(getMember, NullableOf!ST, m));
+                            else
+                                alias CT = typeof(__traits(getMember, ST, m));
+
+                            static if (isNullable!CT)
+                            {
+                                static if (isNullable!ST)
+                                {
+                                    if (__traits(getMember, source.get, m).isNull)
+                                        __traits(getMember, source.get, m) = NullableOf!CT();
+                                }
+                                else
+                                {
+                                    if (__traits(getMember, source, m).isNull)
+                                        __traits(getMember, source, m) = NullableOf!CT();
+                                }
+                            }
+
+                            static if (isNullable!ST)
+                                setValue(__traits(getMember, source.get, m), path);
+                            else
+                                setValue(__traits(getMember, source, m), path);
+                        }
                     }
-                }}
+                }
             }
         }
     }
@@ -351,24 +362,24 @@ private:
 
         auto path = this._memoryManager.getAppender();
 
-        scope(exit)
+        scope (exit)
             this._memoryManager.releaseAppender(path);
 
         _current = S();
 
-        while(!empty)
+        while (!empty)
         {
             auto entity = this._entities.front;
 
-            if(entity.type == EntityType.elementStart)
+            if (entity.type == EntityType.elementStart)
             {
                 path.put(entity.name.cleanNs);
                 setValue(_current, path.data);
             }
 
-            if(entity.type == EntityType.elementEnd)
+            if (entity.type == EntityType.elementEnd)
             {
-                if(path.data.length == 1)
+                if (path.data.length == 1)
                     break;
                 path.shrinkTo(path.data.length - 1u);
             }
@@ -404,13 +415,14 @@ public:
         {
             this._entities.popFront();
 
-            if(!this._entities.empty)
+            if (!this._entities.empty)
             {
                 auto entity = this._entities.front;
                 this._endOfFragment = entity.type == EntityType.elementEnd
                     && rootName!S != entity.name.cleanNs;
             }
-        } while(!isNextEntityReached());
+        }
+        while (!isNextEntityReached());
         buildCurrent();
     }
 
@@ -424,7 +436,7 @@ public:
 }
 
 /// Functions that build `DecodedXml` from a range of characters
-DecodedXml!(S, T) decodeXmlAsRangeOf(S, T)(T xmlText) if(isDecodable!T)
+DecodedXml!(S, T) decodeXmlAsRangeOf(S, T)(T xmlText) if (isDecodable!T)
 {
     import dxml.parser : parseXML, simpleXML;
 
@@ -433,7 +445,7 @@ DecodedXml!(S, T) decodeXmlAsRangeOf(S, T)(T xmlText) if(isDecodable!T)
     return DecodedXml!(S, T)(entities, mm);
 }
 
-S decodeXmlAs(S, T)(T xmlText) if(isDecodable!T)
+S decodeXmlAs(S, T)(T xmlText) if (isDecodable!T)
 {
     import std.exception : enforce;
 

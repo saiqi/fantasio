@@ -1,8 +1,9 @@
 module fantasio.extractors.sdmxml21;
 
-import std.typecons : Nullable;
+import std.typecons : Nullable, Flag, No;
 import std.range : isInputRange, ElementType;
 import std.traits : Unqual, hasMember, hasUDA, isArray;
+import fantasio.lib.traits : isIterableOf;
 import fantasio.lib.xml;
 import fantasio.core.model;
 import fantasio.core.errors;
@@ -853,7 +854,158 @@ struct SDMX21DataSet
     SDMX21Series[] series;
 }
 
-Item!Dataset toItem(const ref SDMX21Dataflow dataflow, Language lang) pure @safe
+@safe pure private bool isValidForLookup(const ref SDMX21Ref ref_)
+{
+    return !ref_.agencyId.isNull
+        && !ref_.class_.isNull
+        && !ref_.package_.isNull
+        && !ref_.version_.isNull;
+}
+
+@safe pure private bool isValidForSchemeLookup(const ref SDMX21Ref ref_)
+{
+    return ref_.isValidForLookup
+        && !ref_.maintainableParentId.isNull
+        && !ref_.maintainableParentVersion.isNull;
+}
+
+@safe pure private Nullable!string getUrn(const ref SDMX21Ref ref_)
+{
+    import std.typecons : nullable;
+    import std.format : format;
+
+    if (!ref_.isValidForLookup)
+        return (Nullable!string).init;
+
+    if (!ref_.isValidForSchemeLookup)
+        return format!"urn:sdmx:org.sdmx.infomodel.%s.%s=%s:%s:(%s)"(
+            ref_.package_.get,
+            ref_.class_.get,
+            ref_.agencyId.get,
+            ref_.id,
+            ref_.version_.get
+        ).nullable;
+
+    return format!"urn:sdmx:org.sdmx.infomodel.%s.%s=%s:%s:(%s).%s"(
+        ref_.package_.get,
+        ref_.class_.get,
+        ref_.agencyId.get,
+        ref_.maintainableParentId.get,
+        ref_.maintainableParentVersion.get,
+        ref_.id
+    ).nullable;
+
+}
+
+private auto curate(R)(auto ref R dataflows) if (isIterableOf!(R, SDMX21Dataflow))
+{
+    import std.algorithm : filter;
+
+    return dataflows
+        .filter!(df => !df.id.isNull && !df.agencyId.isNull && !df.version_.isNull);
+}
+
+private auto getDataflowsByCategoryId(RDF, RC)(
+    auto ref RDF dataflows,
+    auto ref RC categorisations,
+    const ref SDMX21Category category,
+    const ref SDMX21CategoryScheme scheme,
+) if (isIterableOf!(RDF, SDMX21Dataflow)
+    && isIterableOf!(RC, SDMX21Categorisation))
+{
+    import std.algorithm : sort, chunkBy, filter, map, uniq;
+    import std.typecons : tuple;
+    import std.array : array;
+    import fantasio.lib.operations : join;
+
+    auto sortedDataflows = dataflows
+        .curate
+        .array
+        .sort!((a, b) =>
+                a.id.get < b.id.get
+                && a.agencyId.get < b.agencyId.get
+                && a.version_.get < b.version_.get);
+
+    return categorisations
+        .filter!(c =>
+                c.target.ref_.isValidForSchemeLookup
+                && c.source.ref_.isValidForLookup
+                && c.target.ref_.id == category.id
+                && c.target.ref_.agencyId.get == scheme.agencyId
+                && c.target.ref_.maintainableParentId.get == scheme.id
+                && c.target.ref_.maintainableParentVersion.get == scheme.version_
+                && c.target.ref_.package_.get == "categoryscheme"
+                && c.target.ref_.class_.get == "Category"
+                && c.source.ref_.package_.get == "datastructure"
+                && c.source.ref_.class_.get == "Dataflow")
+        .array
+        .sort!((a, b) =>
+                a.source.ref_.id < b.source.ref_.id
+                && a.source.ref_.agencyId.get < b.source.ref_.agencyId.get
+                && a.source.ref_.version_.get < b.source.ref_.version_.get)
+        .join!(
+            (c => tuple(
+                c.source.ref_.id,
+                c.source.ref_.agencyId.get,
+                c.source.ref_.version_.get)),
+            (df => tuple(df.id.get, df.agencyId.get, df.version_.get)))(sortedDataflows)
+        .filter!(t => !t.right.isNull)
+        .map!(t => t.right.get)
+        .uniq;
+}
+
+private auto getDataflowsByCategoryUrn(RDF, RC)(
+    auto ref RDF dataflows,
+    auto ref RC categorisations,
+    const ref SDMX21Category category,
+    const ref SDMX21CategoryScheme scheme,
+) if (isIterableOf!(RDF, SDMX21Dataflow)
+    && isIterableOf!(RC, SDMX21Categorisation))
+{
+    import std.algorithm : sort, chunkBy, filter, map, uniq;
+    import std.typecons : tuple;
+    import std.exception : enforce;
+    import std.format;
+    import std.array : array;
+    import fantasio.lib.operations : join;
+
+    enforce!NotIdentifiableSource(
+        !category.urn.isNull,
+        format!"Caterory %s URN is null"(category.id)
+    );
+
+    auto sortedDataflows = dataflows
+        .curate
+        .array
+        .sort!((a, b) =>
+                a.id.get < b.id.get
+                && a.agencyId.get < b.agencyId.get
+                && a.version_.get < b.version_.get);
+
+    return categorisations
+        .filter!(c =>
+                !c.target.ref_.getUrn.isNull
+                && c.source.ref_.isValidForLookup
+                && c.target.ref_.getUrn.get == category.urn.get
+                && c.source.ref_.package_.get == "datastructure"
+                && c.source.ref_.class_.get == "Dataflow")
+        .array
+        .sort!((a, b) =>
+                a.source.ref_.id < b.source.ref_.id
+                && a.source.ref_.agencyId.get < b.source.ref_.agencyId.get
+                && a.source.ref_.version_.get < b.source.ref_.version_.get)
+        .join!(
+            (c => tuple(
+                c.source.ref_.id,
+                c.source.ref_.agencyId.get,
+                c.source.ref_.version_.get)),
+            (df => tuple(df.id.get, df.agencyId.get, df.version_.get)))(sortedDataflows)
+        .filter!(t => !t.right.isNull)
+        .map!(t => t.right.get)
+        .uniq;
+}
+
+@safe pure private Item getItemFromDataflow(const ref SDMX21Dataflow dataflow, Language lang)
 {
     import std.typecons : nullable;
     import std.exception : enforce;
@@ -864,19 +1016,116 @@ Item!Dataset toItem(const ref SDMX21Dataflow dataflow, Language lang) pure @safe
     auto name = dataflow.names.dup.extractLanguage!"lang"(lang);
     enforce!LanguageNotFound(!name.isNull, lang);
 
-    return Item!Dataset(Dataset(dataflow.id.get, name.get.content.nullable));
+    return Item(ItemT(Dataset(dataflow.id.get, name.get.content.nullable)));
+}
+
+@safe pure private Collection getCollectionFromCategory(RDF, RC)(
+    auto ref RDF dataflows,
+    auto ref RC categorisations,
+    const ref SDMX21Category category,
+    const ref SDMX21CategoryScheme scheme,
+    Language lang = DefaultLanguage,
+    Flag!"joinWithUrn" joinWithUrn = No.joinWithUrn
+) if (isIterableOf!(RDF, SDMX21Dataflow)
+    && isIterableOf!(RC, SDMX21Categorisation))
+{
+    import std.exception : enforce;
+    import std.typecons : nullable;
+    import std.range : chain;
+    import std.algorithm : map;
+    import std.array : array;
+    import fantasio.core.label : extractLanguage;
+
+    auto name = category.names.dup.extractLanguage!"lang"(lang);
+    enforce!LanguageNotFound(!name.isNull);
+
+    auto datasets =
+        joinWithUrn ? ItemT(
+            getDataflowsByCategoryUrn(
+                dataflows,
+                categorisations,
+                category,
+                scheme
+        ).toCollection) : ItemT(
+        getDataflowsByCategoryId(
+            dataflows,
+            categorisations,
+            category,
+            scheme).toCollection);
+
+    auto collections = category.children.map!(
+        c => ItemT(getCollectionFromCategory(dataflows, categorisations, c, scheme, lang, joinWithUrn))
+    );
+
+    Item[] items = [datasets]
+        .chain(collections)
+        .map!(a => Item(a))
+        .array;
+
+    return Collection(name.get.content.nullable, [], Link(items));
+}
+
+private Collection getCollectionFromCategoryScheme(RDF, RC)(
+    auto ref RDF dataflows,
+    auto ref RC categorisations,
+    const ref SDMX21CategoryScheme scheme,
+    Language lang,
+    Flag!"joinWithUrn" joinWithUrn
+) if (isIterableOf!(RDF, SDMX21Dataflow)
+    && isIterableOf!(RC, SDMX21Categorisation))
+{
+    import std.exception : enforce;
+    import std.algorithm : map;
+    import std.array : array;
+    import std.typecons : nullable;
+    import fantasio.core.label : extractLanguage;
+
+    auto name = scheme.names.dup.extractLanguage!"lang"(lang);
+    enforce!LanguageNotFound(!name.isNull, lang);
+
+    Item[] items = scheme.categories
+        .map!(
+            c => Item(ItemT(getCollectionFromCategory(dataflows, categorisations, c, scheme, lang, joinWithUrn)))
+        )
+        .array;
+
+    return Collection(name.get.content.nullable, [], Link(items));
 }
 
 /// Convert a range of dataflows to a collection of datasets
-Collection!Dataset toCollection(R)(auto ref R dataflows, Language lang = DefaultLanguage)
-        if ((isInputRange!R || isArray!R) && is(Unqual!(ElementType!R) == SDMX21Dataflow))
+Collection toCollection(R)(auto ref R dataflows, Language lang = DefaultLanguage)
+        if (isIterableOf!(R, SDMX21Dataflow))
 {
     import std.algorithm : map;
     import std.array : array;
 
-    return Collection!Dataset(
-        (Nullable!string).init,
+    return Collection(
+        (Nullable!string).init, // TODO populate label
         [],
-        Link!Dataset(dataflows.array.map!(df => df.toItem(lang)).array)
+        Link(dataflows.curate.map!(df => df.getItemFromDataflow(lang)).array)
     );
+}
+
+/// Convert a range of dataflows to a collection of collection of datasets
+Collection toCollection(RDF, RCS, RC)(
+    auto ref RDF dataflows,
+    auto ref RCS categoryschemes,
+    auto ref RC categorisations,
+    Language lang = DefaultLanguage,
+    Flag!"joinWithUrn" joinWithUrn = No.joinWithUrn
+)
+
+        if (isIterableOf!(RDF, SDMX21Dataflow)
+        && isIterableOf!(RCS, SDMX21CategoryScheme)
+        && isIterableOf!(RC, SDMX21Categorisation))
+{
+    import std.algorithm : map;
+    import std.array : array;
+
+    Item[] collections = categoryschemes
+        .map!(
+            s => Item(ItemT(getCollectionFromCategoryScheme(dataflows, categorisations, s, lang, joinWithUrn)))
+        )
+        .array;
+    return Collection((Nullable!string).init, [], Link(collections));
 }

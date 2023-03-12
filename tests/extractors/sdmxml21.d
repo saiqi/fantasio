@@ -11,7 +11,7 @@ private string getFixture(string name)
     return readText("samples/sdmxml21/" ~ name ~ ".xml");
 }
 
-private SDMX21Structures getStructureFixture(string name)
+@trusted private SDMX21Structures getStructureFixture(string name)
 {
     import fantasio.lib.xml : decodeXmlAs;
 
@@ -1233,19 +1233,188 @@ unittest
         SDMX21Dataflow()
     ];
 
-    auto result = dataflows[0 .. 2].toCollection(Language.en);
+    auto result = dataflows.toCollection(Language.en);
 
-    auto expected = Collection!Dataset(
+    auto expected = Collection(
         (Nullable!string).init,
         [],
-        Link!Dataset([
-            Item!Dataset(Dataset("foo", "Foo".nullable)),
-            Item!Dataset(Dataset("bar", "Bar".nullable))
+        Link([
+            Item(ItemT(Dataset("foo", "Foo".nullable))),
+            Item(ItemT(Dataset("bar", "Bar".nullable)))
         ])
     );
     () @trusted { result.shouldEqual(expected); }();
 
     dataflows.toCollection(Language.es).shouldThrow!LanguageNotFound;
-    dataflows.toCollection(Language.fr).shouldThrow!NotIdentifiableSource;
+}
 
+@("convert dataflows, categorisations and categoryschemes to collection")
+@safe unittest
+{
+    import std.typecons : Yes;
+    import fantasio.core.model;
+
+    auto dataflows = [
+        SDMX21Dataflow(
+            "gdp".nullable,
+            (Nullable!string).init,
+            "acme".nullable,
+            "1.0".nullable,
+            (Nullable!bool).init,
+            [SDMX21Name("en", "GDP"), SDMX21Name("fr", "PIB")]
+        ),
+        SDMX21Dataflow(
+            "birth".nullable,
+            (Nullable!string).init,
+            "acme".nullable,
+            "1.0".nullable,
+            (Nullable!bool).init,
+            [SDMX21Name("en", "Birth"), SDMX21Name("fr", "Naissance")]
+        ),
+    ];
+
+    // dfmt off
+    auto categorisations = [
+        SDMX21Categorisation(
+            "0",
+            (Nullable!string).init,
+            "acme",
+            "1.0",
+            [],
+            [],
+            SDMX21Source(SDMX21Ref(
+                "gdp",
+                "1.0".nullable,
+                (Nullable!string)
+                .init,
+                (Nullable!string).init,
+                "acme".nullable,
+                "datastructure".nullable,
+                "Dataflow".nullable
+            )),
+            SDMX21Target(SDMX21Ref(
+                    "eco-agg",
+                    "1.0".nullable,
+                    "scheme".nullable,
+                    "1.0".nullable,
+                    "acme".nullable,
+                    "categoryscheme".nullable,
+                    "Category".nullable
+            ))
+        ),
+        SDMX21Categorisation(
+            "0",
+            (Nullable!string).init,
+            "acme",
+            "1.0",
+            [],
+            [],
+            SDMX21Source(SDMX21Ref(
+                "gdp",
+                "1.0".nullable,
+                (Nullable!string).init,
+                (Nullable!string).init,
+                "acme".nullable,
+                "datastructure".nullable,
+                "Dataflow".nullable
+            )),
+            SDMX21Target(SDMX21Ref(
+                    "shortlist",
+                    "1.0".nullable,
+                    "scheme".nullable,
+                    "1.0".nullable,
+                    "acme".nullable,
+                    "categoryscheme".nullable,
+                    "Category".nullable
+            ))
+        )
+    ];
+    // dfmt on
+
+    auto categoryschemes = [
+        SDMX21CategoryScheme(
+            "scheme",
+            (Nullable!string).init,
+            "acme",
+            "1.0",
+            [
+                SDMX21Name("en", "All categories"),
+                SDMX21Name("fr", "Toutes les catégories")
+            ],
+            [],
+            [
+                SDMX21Category(
+                    "eco",
+                    "urn:sdmx:org.sdmx.infomodel.categoryscheme.Category=acme:scheme:(1.0).eco".nullable,
+                    [SDMX21Name("en", "Economy"), SDMX21Name("fr", "Economie")],
+                    [],
+                    [
+                        SDMX21Category(
+                        "eco-agg",
+                        "urn:sdmx:org.sdmx.infomodel.categoryscheme.Category=acme:scheme:(1.0).eco-agg".nullable,
+                        [
+                            SDMX21Name("en", "Economy - Aggregates"),
+                            SDMX21Name("fr", "Economie - Aggrégats")
+                        ],
+                        []
+                        )
+                    ]
+                ),
+                SDMX21Category(
+                    "shortlist",
+                    "urn:sdmx:org.sdmx.infomodel.categoryscheme.Category=acme:scheme:(1.0).shortlist".nullable,
+                    [
+                        SDMX21Name("en", "Shortlist"),
+                        SDMX21Name("fr", "Préselection")
+                    ],
+                    []
+                )
+            ]
+        )
+    ];
+
+    auto collectionById = toCollection(dataflows, categoryschemes, categorisations);
+    auto collectionByUrn = toCollection(
+        dataflows,
+        categoryschemes,
+        categorisations,
+        Language.en, Yes.joinWithUrn);
+
+    // dfmt off
+    auto expected = Collection(
+        (Nullable!string).init,
+        [],
+        Link([
+            Item(ItemT(Collection("All categories".nullable, [], Link([
+                Item(ItemT(Collection("Economy".nullable, [], Link([
+                    Item(ItemT(Collection((Nullable!string).init, [], Link([])))),
+                    Item(ItemT(Collection("Economy - Aggregates".nullable, [], Link([
+                        Item(ItemT(Collection((Nullable!string).init, [], Link([
+                            Item(ItemT(Dataset("gdp", "GDP".nullable)))
+                        ]))))
+                    ]))))
+                ])))),
+                Item(ItemT(Collection("Shortlist".nullable, [], Link([
+                    Item(ItemT(Collection((Nullable!string).init, [], Link([
+                        Item(ItemT(Dataset("gdp", "GDP".nullable)))
+                    ]))))
+                ]))))
+            ]))))
+        ])
+    );
+    // dfmt on
+
+    () @trusted { collectionById.shouldEqual(expected); }();
+    () @trusted { collectionByUrn.shouldEqual(expected); }();
+}
+
+@("check purity and safety")
+@safe pure unittest
+{
+    SDMX21Dataflow[] dataflows;
+    SDMX21Categorisation[] categorisations;
+    SDMX21CategoryScheme[] schemes;
+
+    toCollection(dataflows);
+    toCollection(dataflows, schemes, categorisations);
 }
