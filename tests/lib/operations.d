@@ -1,6 +1,6 @@
 module tests.lib.operations;
 
-import fantasio.lib.operations : join;
+import fantasio.lib.operations : leftouterjoin;
 import unit_threaded;
 
 @("join two ranges of structs")
@@ -21,7 +21,7 @@ import unit_threaded;
 
     {
         auto r = iota(3).map!(i => Foo(i))
-            .join!(f => f.id, b => b.key)(
+            .leftouterjoin!(f => f.id, b => b.key)(
                 iota(3).filter!(i => i % 2 == 0)
                     .map!(i => Bar(i)));
         assert(!r.empty);
@@ -36,7 +36,7 @@ import unit_threaded;
 
     {
         auto r = iota(3).map!(i => Foo(i))
-            .join!(f => f.id, b => b.key)(
+            .leftouterjoin!(f => f.id, b => b.key)(
                 iota(4).filter!(i => i >= 3)
                     .map!(i => Bar(i)));
         assert(r.walkLength == 3);
@@ -46,7 +46,7 @@ import unit_threaded;
     {
         auto r = iota(3).filter!(i => i % 2 == 0)
             .map!(i => Foo(i))
-            .join!(f => f.id, b => b.key)(
+            .leftouterjoin!(f => f.id, b => b.key)(
                 iota(3).map!(i => Bar(i)));
         assert(!r.empty);
         assert(r.front[0] == Foo(0) && r.front[1].get == Bar(0));
@@ -99,7 +99,7 @@ import unit_threaded;
         "ENERGIE_PRIMAIRE", "SUPPRESSION"
     ];
 
-    auto r = left.join!(x => x, x => x)(right.sort);
+    auto r = left.leftouterjoin!(x => x, x => x)(right.sort);
     assert(!r.empty);
     assert(!r.front.right.isNull);
 }

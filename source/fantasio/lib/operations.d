@@ -14,7 +14,7 @@ import std.range;
  * Returns:
  *   `Tuple!(ElementType!R1, "left", Nullable!(ElementType!R2), "right")`
  */
-auto join(alias leftKeyFunc, alias rightKeyFunc, R1, R2)(R1 left, R2 right)
+auto leftouterjoin(alias leftKeyFunc, alias rightKeyFunc, R1, R2)(R1 left, R2 right)
         if (isInputRange!R1 && isInputRange!R2)
 {
     import std.typecons : Tuple, Nullable, nullable;

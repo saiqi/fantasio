@@ -923,7 +923,7 @@ private auto getDataflowsByCategoryId(RDF, RC)(
     import std.algorithm : sort, chunkBy, filter, map, uniq;
     import std.typecons : tuple;
     import std.array : array;
-    import fantasio.lib.operations : join;
+    import fantasio.lib.operations : leftouterjoin;
 
     auto sortedDataflows = dataflows.curateAndSort;
 
@@ -944,7 +944,7 @@ private auto getDataflowsByCategoryId(RDF, RC)(
                 a.source.ref_.id < b.source.ref_.id
                 && a.source.ref_.agencyId.get < b.source.ref_.agencyId.get
                 && a.source.ref_.version_.get < b.source.ref_.version_.get)
-        .join!(
+        .leftouterjoin!(
             (c => tuple(
                 c.source.ref_.id,
                 c.source.ref_.agencyId.get,
@@ -968,7 +968,7 @@ private auto getDataflowsByCategoryUrn(RDF, RC)(
     import std.exception : enforce;
     import std.format;
     import std.array : array;
-    import fantasio.lib.operations : join;
+    import fantasio.lib.operations : leftouterjoin;
 
     enforce!NotIdentifiableSource(
         !category.urn.isNull,
@@ -989,7 +989,7 @@ private auto getDataflowsByCategoryUrn(RDF, RC)(
                 a.source.ref_.id < b.source.ref_.id
                 && a.source.ref_.agencyId.get < b.source.ref_.agencyId.get
                 && a.source.ref_.version_.get < b.source.ref_.version_.get)
-        .join!(
+        .leftouterjoin!(
             (c => tuple(
                 c.source.ref_.id,
                 c.source.ref_.agencyId.get,
