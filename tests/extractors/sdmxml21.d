@@ -1293,17 +1293,17 @@ unittest
                 "Dataflow".nullable
             )),
             SDMX21Target(SDMX21Ref(
-                    "eco-agg",
-                    "1.0".nullable,
-                    "scheme".nullable,
-                    "1.0".nullable,
-                    "acme".nullable,
-                    "categoryscheme".nullable,
-                    "Category".nullable
+                "eco-agg",
+                "1.0".nullable,
+                "scheme".nullable,
+                "1.0".nullable,
+                "acme".nullable,
+                "categoryscheme".nullable,
+                "Category".nullable
             ))
         ),
         SDMX21Categorisation(
-            "0",
+            "1",
             (Nullable!string).init,
             "acme",
             "1.0",
@@ -1319,13 +1319,39 @@ unittest
                 "Dataflow".nullable
             )),
             SDMX21Target(SDMX21Ref(
-                    "shortlist",
-                    "1.0".nullable,
-                    "scheme".nullable,
-                    "1.0".nullable,
-                    "acme".nullable,
-                    "categoryscheme".nullable,
-                    "Category".nullable
+                "shortlist",
+                "1.0".nullable,
+                "scheme".nullable,
+                "1.0".nullable,
+                "acme".nullable,
+                "categoryscheme".nullable,
+                "Category".nullable
+            ))
+        ),
+        SDMX21Categorisation(
+            "2",
+            (Nullable!string).init,
+            "acme",
+            "1.0",
+            [],
+            [],
+            SDMX21Source(SDMX21Ref(
+                "birth",
+                "1.0".nullable,
+                (Nullable!string).init,
+                (Nullable!string).init,
+                "acme".nullable,
+                "datastructure".nullable,
+                "Dataflow".nullable
+            )),
+            SDMX21Target(SDMX21Ref(
+                "shortlist",
+                "1.0".nullable,
+                "scheme".nullable,
+                "1.0".nullable,
+                "acme".nullable,
+                "categoryscheme".nullable,
+                "Category".nullable
             ))
         )
     ];
@@ -1378,7 +1404,8 @@ unittest
         dataflows,
         categoryschemes,
         categorisations,
-        Language.en, Yes.joinWithUrn);
+        Language.en,
+        Yes.joinWithUrn);
 
     // dfmt off
     auto expected = Collection(
@@ -1396,7 +1423,8 @@ unittest
                 ])))),
                 Item(ItemT(Collection("Shortlist".nullable, [], Link([
                     Item(ItemT(Collection((Nullable!string).init, [], Link([
-                        Item(ItemT(Dataset("gdp", "GDP".nullable)))
+                        Item(ItemT(Dataset("birth", "Birth".nullable))),
+                        Item(ItemT(Dataset("gdp", "GDP".nullable))),
                     ]))))
                 ]))))
             ]))))

@@ -1,6 +1,6 @@
 module fantasio.extractors.sdmxml21;
 
-import std.typecons : Nullable, Flag, No;
+import std.typecons : Nullable, Flag, No, Tuple;
 import std.range : isInputRange, ElementType;
 import std.traits : Unqual, hasMember, hasUDA, isArray;
 import fantasio.lib.traits : isIterableOf;
@@ -897,19 +897,17 @@ struct SDMX21DataSet
 
 }
 
-private auto curateAndSort(R)(auto ref R dataflows)
-        if (isIterableOf!(R, SDMX21Dataflow))
+@safe pure private Tuple!(string, string, string) categorisationKey(
+    const ref SDMX21Categorisation c)
+in (c.source.ref_.isValidForLookup, "source reference nullable fields have not been checked")
 {
-    import std.algorithm : filter, sort;
-    import std.array : array;
+    return typeof(return)(c.source.ref_.id, c.source.ref_.agencyId.get, c.source.ref_.version_.get);
+}
 
-    return dataflows
-        .filter!(df => !df.id.isNull && !df.agencyId.isNull && !df.version_.isNull)
-        .array
-        .sort!((a, b) =>
-                a.id.get < b.id.get
-                && a.agencyId.get < b.agencyId.get
-                && a.version_.get < b.version_.get);
+@safe pure private Tuple!(string, string, string) dataflowKey(const ref SDMX21Dataflow df)
+in (!df.id.isNull && !df.agencyId.isNull && !df.version_.isNull, "dataflow nullable fields have not been checked")
+{
+    return typeof(return)(df.id.get, df.agencyId.get, df.version_.get);
 }
 
 private auto getDataflowsByCategoryId(RDF, RC)(
@@ -920,12 +918,9 @@ private auto getDataflowsByCategoryId(RDF, RC)(
 ) if (isIterableOf!(RDF, SDMX21Dataflow)
     && isIterableOf!(RC, SDMX21Categorisation))
 {
-    import std.algorithm : sort, chunkBy, filter, map, uniq;
-    import std.typecons : tuple;
+    import std.algorithm : sort, filter, map, uniq;
     import std.array : array;
     import fantasio.lib.operations : leftouterjoin;
-
-    auto sortedDataflows = dataflows.curateAndSort;
 
     return categorisations
         .filter!(c =>
@@ -940,16 +935,12 @@ private auto getDataflowsByCategoryId(RDF, RC)(
                 && c.source.ref_.package_.get == "datastructure"
                 && c.source.ref_.class_.get == "Dataflow")
         .array
-        .sort!((a, b) =>
-                a.source.ref_.id < b.source.ref_.id
-                && a.source.ref_.agencyId.get < b.source.ref_.agencyId.get
-                && a.source.ref_.version_.get < b.source.ref_.version_.get)
-        .leftouterjoin!(
-            (c => tuple(
-                c.source.ref_.id,
-                c.source.ref_.agencyId.get,
-                c.source.ref_.version_.get)),
-            (df => tuple(df.id.get, df.agencyId.get, df.version_.get)))(sortedDataflows)
+        .sort!((a, b) => categorisationKey(a) < categorisationKey(b))
+        .leftouterjoin!(categorisationKey, dataflowKey)(
+            dataflows
+                .filter!(df => !df.id.isNull && !df.agencyId.isNull && !df.version_.isNull)
+                .array
+                .sort!((a, b) => dataflowKey(a) < dataflowKey(b)))
         .filter!(t => !t.right.isNull)
         .map!(t => t.right.get)
         .uniq;
@@ -963,10 +954,9 @@ private auto getDataflowsByCategoryUrn(RDF, RC)(
 ) if (isIterableOf!(RDF, SDMX21Dataflow)
     && isIterableOf!(RC, SDMX21Categorisation))
 {
-    import std.algorithm : sort, chunkBy, filter, map, uniq;
-    import std.typecons : tuple;
+    import std.algorithm : sort, filter, map, uniq;
     import std.exception : enforce;
-    import std.format;
+    import std.format : format;
     import std.array : array;
     import fantasio.lib.operations : leftouterjoin;
 
@@ -974,8 +964,6 @@ private auto getDataflowsByCategoryUrn(RDF, RC)(
         !category.urn.isNull,
         format!"Caterory %s URN is null"(category.id)
     );
-
-    auto sortedDataflows = dataflows.curateAndSort;
 
     return categorisations
         .filter!(c =>
@@ -985,16 +973,12 @@ private auto getDataflowsByCategoryUrn(RDF, RC)(
                 && c.source.ref_.package_.get == "datastructure"
                 && c.source.ref_.class_.get == "Dataflow")
         .array
-        .sort!((a, b) =>
-                a.source.ref_.id < b.source.ref_.id
-                && a.source.ref_.agencyId.get < b.source.ref_.agencyId.get
-                && a.source.ref_.version_.get < b.source.ref_.version_.get)
-        .leftouterjoin!(
-            (c => tuple(
-                c.source.ref_.id,
-                c.source.ref_.agencyId.get,
-                c.source.ref_.version_.get)),
-            (df => tuple(df.id.get, df.agencyId.get, df.version_.get)))(sortedDataflows)
+        .sort!((a, b) => categorisationKey(a) < categorisationKey(b))
+        .leftouterjoin!(categorisationKey, dataflowKey)(
+            dataflows
+                .filter!(df => !df.id.isNull && !df.agencyId.isNull && !df.version_.isNull)
+                .array
+                .sort!((a, b) => dataflowKey(a) < dataflowKey(b)))
         .filter!(t => !t.right.isNull)
         .map!(t => t.right.get)
         .uniq;
