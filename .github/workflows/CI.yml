@@ -16,7 +16,7 @@ jobs:
     strategy:
       matrix:
         dc:
-          - dmd-2.100.0
+          - dmd-2.100.2
     runs-on: ubuntu-latest
 
     steps:

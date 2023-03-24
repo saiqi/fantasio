@@ -1,31 +1,39 @@
 {
-    "authors": [
-        "saiqi"
-    ],
-    "copyright": "Copyright © 2022, saiqi",
-    "dependencies": {
-        "dxml": "~>0.4.3"
-    },
-    "description": "A lightweight ETL solution",
-    "license": "MIT",
-    "name": "fantasio",
-    "targetType": "executable",
-    "targetPath": "bin",
-    "configurations": [
-        {
-            "name": "executable"
-        },
-        {
-            "name": "unittest",
-            "targetType": "executable",
-            "targetName": "ut",
-            "sourcePaths": ["tests"],
-            "preBuildCommands": ["$DUB run --compiler=$$DC unit-threaded -c gen_ut_main -- -f bin/ut.d -d $DUB"],
-            "mainSourceFile": "bin/ut.d",
-            "excludedSourceFiles": ["source/app.d"],
-            "dependencies": {
-                "unit-threaded": "*"
-            }
-        }
-    ]
+	"authors": [
+		"saiqi"
+	],
+	"configurations": [
+		{
+			"name": "executable",
+			"targetType": "executable"
+		},
+		{
+			"dependencies": {
+				"unit-threaded": ">=0.0.0"
+			},
+			"excludedSourceFiles": [
+				"source/app.d"
+			],
+			"mainSourceFile": "bin/ut.d",
+			"name": "unittest",
+			"preBuildCommands": [
+				"$DUB run --compiler=$$DC unit-threaded -c gen_ut_main -- -f bin/ut.d -d $DUB"
+			],
+			"sourcePaths": [
+				"tests"
+			],
+			"targetName": "ut",
+			"targetType": "executable"
+		}
+	],
+	"copyright": "Copyright © 2022, saiqi",
+	"dependencies": {
+		"dxml": "~>0.4.3",
+		"vibe-d": "~>0.9.6"
+	},
+	"description": "A lightweight ETL solution",
+	"license": "MIT",
+	"name": "fantasio",
+	"targetPath": "bin",
+	"targetType": "executable"
 }
