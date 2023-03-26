@@ -1,4 +1,4 @@
-module fantasio.extractors.sdmxml20;
+module fantasio.extractors.sdmxml20.types;
 
 import std.typecons : Nullable;
 import fantasio.lib.xml;

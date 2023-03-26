@@ -2,7 +2,8 @@ module tests.extractors.sdmxml21;
 
 import std.typecons : nullable, Nullable;
 import unit_threaded;
-import fantasio.extractors.sdmxml21;
+import fantasio.extractors.sdmxml21.types;
+import fantasio.extractors.sdmxml21.conv : toCollection;
 
 private string getFixture(string name)
 {
