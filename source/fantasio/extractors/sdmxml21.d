@@ -8,18 +8,6 @@ import fantasio.lib.xml;
 import fantasio.core.model;
 import fantasio.core.errors;
 
-struct Class
-{
-    string name;
-}
-
-struct Package
-{
-    string name;
-}
-
-enum ItemScheme;
-
 @XmlRoot("Text")
 struct SDMX21Text
 {
@@ -45,8 +33,6 @@ struct SDMX21Error_
 }
 
 @XmlRoot("Dataflow")
-@Class("Dataflow")
-@Package("datastructure")
 struct SDMX21Dataflow
 {
     @XmlAttr("id")
@@ -176,9 +162,6 @@ struct SDMX21LocalRepresentation
 }
 
 @XmlRoot("TimeDimension")
-@Class("TimeDimension")
-@Package("datastructure")
-@ItemScheme
 struct SDMX21TimeDimension
 {
     @XmlAttr("id")
@@ -198,9 +181,6 @@ struct SDMX21TimeDimension
 }
 
 @XmlRoot("Dimension")
-@Class("Dimension")
-@Package("datastructure")
-@ItemScheme
 struct SDMX21Dimension
 {
     @XmlAttr("id")
@@ -249,9 +229,6 @@ struct SDMX21AttributeRelationship
 }
 
 @XmlRoot("Attribute")
-@Class("DataAttribute")
-@Package("datastructure")
-@ItemScheme
 struct SDMX21Attribute
 {
     @XmlAttr("id")
@@ -315,9 +292,6 @@ struct SDMX21Group
 }
 
 @XmlRoot("PrimaryMeasure")
-@Class("PrimaryMeasure")
-@Package("datastructure")
-@ItemScheme
 struct SDMX21PrimaryMeasure
 {
     @XmlAttr("id")
@@ -366,8 +340,6 @@ struct SDMX21DataStructureComponents
 }
 
 @XmlRoot("DataStructure")
-@Class("DataStructure")
-@Package("datastructure")
 struct SDMX21DataStructure
 {
     @XmlAttr("id")
@@ -393,9 +365,6 @@ struct SDMX21DataStructure
 }
 
 @XmlRoot("Code")
-@Class("Code")
-@Package("codelist")
-@ItemScheme
 struct SDMX21Code
 {
     @XmlAttr("id")
@@ -412,8 +381,6 @@ struct SDMX21Code
 }
 
 @XmlRoot("Codelist")
-@Class("Codelist")
-@Package("codelist")
 struct SDMX21Codelist
 {
     @XmlAttr("id")
@@ -439,9 +406,6 @@ struct SDMX21Codelist
 }
 
 @XmlRoot("Concept")
-@Class("Concept")
-@Package("conceptscheme")
-@ItemScheme
 struct SDMX21Concept
 {
     @XmlAttr("id")
@@ -458,8 +422,6 @@ struct SDMX21Concept
 }
 
 @XmlRoot("ConceptScheme")
-@Class("ConceptScheme")
-@Package("conceptscheme")
 struct SDMX21ConceptScheme
 {
     @XmlAttr("id")
@@ -485,9 +447,6 @@ struct SDMX21ConceptScheme
 }
 
 @XmlRoot("Category")
-@Class("Category")
-@Package("categoryscheme")
-@ItemScheme
 struct SDMX21Category
 {
     @XmlAttr("id")
@@ -507,8 +466,6 @@ struct SDMX21Category
 }
 
 @XmlRoot("CategoryScheme")
-@Class("CategoryScheme")
-@Package("categoryscheme")
 struct SDMX21CategoryScheme
 {
     @XmlAttr("id")
@@ -548,8 +505,6 @@ struct SDMX21Target
 }
 
 @XmlRoot("Categorisation")
-@Class("Categorisation")
-@Package("categoryscheme")
 struct SDMX21Categorisation
 {
     @XmlAttr("id")
@@ -691,9 +646,6 @@ struct SDMX21Constraints
 }
 
 @XmlRoot("Agency")
-@Class("Agency")
-@Package("base")
-@ItemScheme
 struct SDMX21Agency
 {
     @XmlAttr("id")
@@ -710,8 +662,6 @@ struct SDMX21Agency
 }
 
 @XmlRoot("AgencyScheme")
-@Class("AgencyScheme")
-@Package("base")
 struct SDMX21AgencyScheme
 {
     @XmlAttr("id")
@@ -869,32 +819,41 @@ struct SDMX21DataSet
         && !ref_.maintainableParentVersion.isNull;
 }
 
-@safe pure private Nullable!string getUrn(const ref SDMX21Ref ref_)
+@safe pure private string getUrn(const ref SDMX21Ref ref_)
 {
-    import std.typecons : nullable;
     import std.format : format;
+    import std.exception : enforce;
 
-    if (!ref_.isValidForLookup)
-        return (Nullable!string).init;
+    enforce!NotIdentifiableSource(
+        ref_.isValidForLookup, "Missing mandatory fields to determine Ref URN");
 
-    if (!ref_.isValidForSchemeLookup)
+    switch (ref_.class_.get)
+    {
+    case "Dataflow":
         return format!"urn:sdmx:org.sdmx.infomodel.%s.%s=%s:%s:(%s)"(
             ref_.package_.get,
             ref_.class_.get,
             ref_.agencyId.get,
             ref_.id,
             ref_.version_.get
-        ).nullable;
+        );
 
-    return format!"urn:sdmx:org.sdmx.infomodel.%s.%s=%s:%s:(%s).%s"(
-        ref_.package_.get,
-        ref_.class_.get,
-        ref_.agencyId.get,
-        ref_.maintainableParentId.get,
-        ref_.maintainableParentVersion.get,
-        ref_.id
-    ).nullable;
-
+    case "Category":
+        enforce!NotIdentifiableSource(
+            ref_.isValidForSchemeLookup, "Missing mandatory scheme related fields to determine Ref URN");
+        return format!"urn:sdmx:org.sdmx.infomodel.%s.%s=%s:%s:(%s).%s"(
+            ref_.package_.get,
+            ref_.class_.get,
+            ref_.agencyId.get,
+            ref_.maintainableParentId.get,
+            ref_.maintainableParentVersion.get,
+            ref_.id
+        );
+    default:
+        enforce!NotIdentifiableSource(false, format!"%s URN from Ref is not implemented"(
+                ref_.class_.get));
+    }
+    assert(false);
 }
 
 @safe pure private Tuple!(string, string, string) categorisationKey(
@@ -967,9 +926,8 @@ private auto getDataflowsByCategoryUrn(RDF, RC)(
 
     return categorisations
         .filter!(c =>
-                !c.target.ref_.getUrn.isNull
-                && c.source.ref_.isValidForLookup
-                && c.target.ref_.getUrn.get == category.urn.get
+                c.source.ref_.isValidForLookup
+                && c.target.ref_.getUrn == category.urn.get
                 && c.source.ref_.package_.get == "datastructure"
                 && c.source.ref_.class_.get == "Dataflow")
         .array
