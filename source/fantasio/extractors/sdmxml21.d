@@ -1192,7 +1192,7 @@ Collection toCollection(RCS, RCL)(
     Language lang = DefaultLanguage
 ) if (isIterableOf!(RCS, SDMX21ConceptScheme) && isIterableOf!(RCL, SDMX21Codelist))
 {
-    import std.algorithm : sort, map, all;
+    import std.algorithm : sort, map, fold;
     import std.range : chain;
     import std.array : array;
     import std.exception : enforce;
@@ -1200,23 +1200,29 @@ Collection toCollection(RCS, RCL)(
     auto sdmxDims = dsd.dataStructureComponents.dimensionList.dimensions;
     auto sdmxTimeDim = dsd.dataStructureComponents.dimensionList.timeDimension;
 
-    enforce!InconsitantSource(
-        sdmxDims.all!(d => !d.position.isNull),
-        "At least one dimension has a null position"
-    );
+    int minPosition = sdmxDims.fold!((acc, cur) {
+        enforce!InconsitantSource(
+            !cur.position.isNull,
+            "At least one dimension has a null position"
+        );
+        return cur.position.get < acc ? cur.position.get : acc;
+    })(int.max);
+
+    enforce!InconsitantSource(!sdmxTimeDim.position.isNull, "Time dimension has a null position");
 
     auto dimensions = sdmxDims
         .dup
         .sort!((a, b) => a.position.get < b.position.get)
-        .map!(d => Item(ItemT(getDimension(d, conceptschemes, codelists, lang))))
-        .chain([
-            Item(ItemT(getDimension(sdmxTimeDim, conceptschemes, codelists, lang)))
-        ])
-        .array;
+        .map!(d => Item(ItemT(getDimension(d, conceptschemes, codelists, lang))));
+
+    auto timeDim = Item(ItemT(getDimension(sdmxTimeDim, conceptschemes, codelists, lang)));
 
     return Collection(
         (Nullable!string).init,
         [],
-        Link(dimensions)
+        Link(
+            minPosition < sdmxTimeDim.position.get ?
+            dimensions.chain([timeDim])
+            .array : [timeDim].chain(dimensions).array)
     );
 }
