@@ -2,9 +2,7 @@ module tests.extractors.sdmxml21;
 
 import std.typecons : nullable, Nullable;
 import unit_threaded;
-import fantasio.extractors.sdmxml21.types;
-import fantasio.extractors.sdmxml21.conv : toCollection, toDataset;
-import fantasio.extractors.sdmxml21.rest;
+import fantasio.extractors.sdmxml21;
 
 private string getFixture(string name)
 {
@@ -1401,16 +1399,8 @@ unittest
         )
     ];
 
-    auto collectionById = toCollection(dataflows, categoryschemes, categorisations);
-    auto collectionByUrn = toCollection(
-        dataflows,
-        categoryschemes,
-        categorisations,
-        Language.en,
-        Yes.joinWithUrn);
-
     // dfmt off
-    auto expected = Collection(
+    auto hierarchyExpected = Collection(
         (Nullable!string).init,
         [],
         Link([
@@ -1434,8 +1424,20 @@ unittest
     );
     // dfmt on
 
-    () @trusted { collectionById.shouldEqual(expected); }();
-    () @trusted { collectionByUrn.shouldEqual(expected); }();
+    {
+        auto collection = toCollection(dataflows, categoryschemes, categorisations);
+        () @trusted { collection.shouldEqual(hierarchyExpected); }();
+    }
+
+    {
+        auto collection = toCollection(
+            dataflows,
+            categoryschemes,
+            categorisations,
+            Language.en,
+            Yes.joinWithUrn);
+        () @trusted { collection.shouldEqual(hierarchyExpected); }();
+    }
 }
 
 @("convert dsd, codelists and conceptschemes to collection")
