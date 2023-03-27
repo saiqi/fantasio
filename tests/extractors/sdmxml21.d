@@ -3,7 +3,8 @@ module tests.extractors.sdmxml21;
 import std.typecons : nullable, Nullable;
 import unit_threaded;
 import fantasio.extractors.sdmxml21.types;
-import fantasio.extractors.sdmxml21.conv : toCollection;
+import fantasio.extractors.sdmxml21.conv : toCollection, toDataset;
+import fantasio.extractors.sdmxml21.rest;
 
 private string getFixture(string name)
 {
@@ -1566,4 +1567,55 @@ unittest
     // dfmt on
 
     () @trusted { result.shouldEqual(expected); }();
+}
+
+auto mockFetcher(const string url, const string[string] params, const string[string] headers)
+{
+    import std.algorithm : canFind;
+    import vibe.core.file : readFileUTF8;
+
+    if (url.canFind("dataflow"))
+        return readFileUTF8("samples/sdmxml21/dataflow.xml");
+    if (url.canFind("datastructure"))
+        return readFileUTF8("samples/sdmxml21/datastructure.xml");
+    assert(false);
+}
+
+@("fetch all artefacts")
+@system unittest
+{
+    import std.typecons : nullable;
+
+    {
+        auto fut = fetchAllDataflows!mockFetcher(
+            "http://my-host:9393",
+            (Nullable!string).init,
+            (Nullable!ReferencesType).init
+        );
+        fut.getResult.shouldEqual(getFixture("dataflow"));
+    }
+
+    {
+        auto fut = fetchAllDataflows!mockFetcher(
+            "http://my-host:9393",
+            "acme".nullable,
+            ReferencesType(GenericReferencesType.parents).nullable,
+        );
+        fut.getResult.shouldEqual(getFixture("dataflow"));
+    }
+}
+
+@("fetch artefact by id")
+@system unittest
+{
+    import std.typecons : nullable;
+
+    auto fut = fetchDsd!mockFetcher(
+        "http://my-host:9393",
+        "acme",
+        "id",
+        (Nullable!ReferencesType).init,
+        "1.0".nullable,
+    );
+    fut.getResult.shouldEqual(getFixture("datastructure"));
 }
