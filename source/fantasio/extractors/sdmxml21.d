@@ -953,9 +953,8 @@ private auto getDataflowsByCategoryUrn(RDF, RC)(
     enforce!NotIdentifiableSource(!dataflow.id.isNull, "Dataflow id is null");
 
     auto name = dataflow.names.dup.extractLanguage!"lang"(lang);
-    enforce!LanguageNotFound(!name.isNull, lang);
 
-    return Item(ItemT(Dataset(dataflow.id.get, name.get.content.nullable)));
+    return Item(ItemT(Dataset(dataflow.id.get, name.content.nullable)));
 }
 
 @safe pure private Collection getCollectionFromCategory(RDF, RC)(
@@ -976,7 +975,6 @@ private auto getDataflowsByCategoryUrn(RDF, RC)(
     import fantasio.core.label : extractLanguage;
 
     auto name = category.names.dup.extractLanguage!"lang"(lang);
-    enforce!LanguageNotFound(!name.isNull);
 
     auto datasets =
         joinWithUrn ? ItemT(
@@ -1001,7 +999,7 @@ private auto getDataflowsByCategoryUrn(RDF, RC)(
         .map!(a => Item(a))
         .array;
 
-    return Collection(name.get.content.nullable, [], Link(items));
+    return Collection(name.content.nullable, [], Link(items));
 }
 
 private Collection getCollectionFromCategoryScheme(RDF, RC)(
@@ -1020,7 +1018,6 @@ private Collection getCollectionFromCategoryScheme(RDF, RC)(
     import fantasio.core.label : extractLanguage;
 
     auto name = scheme.names.dup.extractLanguage!"lang"(lang);
-    enforce!LanguageNotFound(!name.isNull, lang);
 
     Item[] items = scheme.categories
         .map!(
@@ -1028,7 +1025,7 @@ private Collection getCollectionFromCategoryScheme(RDF, RC)(
         )
         .array;
 
-    return Collection(name.get.content.nullable, [], Link(items));
+    return Collection(name.content.nullable, [], Link(items));
 }
 
 private SDMX21Concept findConcept(RCS)(const ref SDMX21Ref ref_, auto ref RCS conceptschemes)
@@ -1101,10 +1098,9 @@ private Category getDimensionCategory(RCL, T)(
     foreach (c; codes)
     {
         auto name = c.names.dup.extractLanguage!"lang"(lang);
-        enforce!LanguageNotFound(!name.isNull, lang);
 
         indexApp.put(c.id);
-        labelApp.put(tuple(c.id, name.get.content));
+        labelApp.put(tuple(c.id, name.content));
     }
 
     return Category(indexApp.data, labelApp.data.assocArray);
@@ -1123,7 +1119,7 @@ private Dimension getDimension(RCS, RCL, T)(
 {
     import std.exception : enforce;
     import std.format : format;
-    import std.typecons : apply;
+    import std.typecons : nullable;
     import fantasio.core.label : extractLanguage;
 
     enforce!NotIdentifiableSource(!dimension.id.isNull, "Dimension id is null");
@@ -1138,7 +1134,7 @@ private Dimension getDimension(RCS, RCL, T)(
     auto category = dimension.getDimensionCategory(codelists, lang);
 
     return Dimension(
-        label.apply!"a.content",
+        label.content.nullable,
         [],
         category
     );

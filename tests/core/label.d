@@ -7,6 +7,7 @@ import unit_threaded;
 @safe pure unittest
 {
     import fantasio.core.model : Language;
+    import fantasio.core.errors : LanguageNotFound;
 
     static struct Label
     {
@@ -17,11 +18,9 @@ import unit_threaded;
     auto labels = [Label("en", "Hello"), Label("fr", "Bonjour")];
     labels
         .extractLanguage!"lang"(Language.en)
-        .get
         .shouldEqual(Label("en", "Hello"));
 
     labels
         .extractLanguage!"lang"(Language.es)
-        .isNull
-        .shouldBeTrue;
+        .shouldThrow!LanguageNotFound;
 }
